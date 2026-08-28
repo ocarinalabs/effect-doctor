@@ -1,0 +1,129 @@
+import { describe, expect, it } from "vitest";
+
+import { decodeTsgoOutput } from "../src/internal/tsgo-output.js";
+import { normalizeTsgoFindings } from "../src/internal/tsgo.js";
+
+const validOutput = {
+  diagnostics: [
+    {
+      code: 1,
+      column: 3,
+      endColumn: 9,
+      endLine: 2,
+      file: "/workspace/src/main.ts",
+      length: 6,
+      line: 2,
+      message: "An Effect value is unused.",
+      name: "floatingEffect",
+      severity: "error",
+      start: 10,
+    },
+  ],
+  files: [
+    {
+      detectedEffect: "v4",
+      file: "/workspace/src/main.ts",
+      supportedEffect: "v4",
+    },
+  ],
+  summary: {
+    errors: 1,
+    filesChecked: 1,
+    messages: 0,
+    totalFiles: 1,
+    warnings: 0,
+  },
+};
+
+describe("decodeTsgoOutput", () => {
+  it("decodes a complete v4 result", () => {
+    expect(decodeTsgoOutput(JSON.stringify(validOutput))).toEqual(validOutput);
+  });
+
+  it("rejects malformed JSON", () => {
+    expect(() => decodeTsgoOutput("{")).toThrowError(/valid JSON string/u);
+  });
+
+  it("rejects a vacuous successful scan", () => {
+    const output = {
+      diagnostics: [],
+      files: [],
+      summary: {
+        errors: 0,
+        filesChecked: 0,
+        messages: 0,
+        totalFiles: 0,
+        warnings: 0,
+      },
+    };
+
+    expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
+      /at least one file/u
+    );
+  });
+
+  it("rejects incomplete file coverage", () => {
+    const output = structuredClone(validOutput);
+    output.summary.totalFiles = 2;
+
+    expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
+      /filesChecked.*totalFiles/u
+    );
+  });
+
+  it("rejects summary counts that disagree with diagnostics", () => {
+    const output = structuredClone(validOutput);
+    output.summary.errors = 0;
+
+    expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
+      /summary counts/u
+    );
+  });
+
+  it("rejects unknown or mismatched Effect versions", () => {
+    const output = structuredClone(validOutput);
+    const file = output.files.at(0);
+    expect(file).toBeDefined();
+    if (file === undefined) {
+      return;
+    }
+    file.detectedEffect = "unknown";
+
+    expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
+      /supported Effect version/u
+    );
+  });
+});
+
+describe("normalizeTsgoFindings", () => {
+  it("leaves directive inventory to Effect Doctor's comment-aware rule", () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    wire.diagnostics = [
+      {
+        ...diagnostic,
+        code: 377_000,
+        message: "@effect-diagnostics directive has no effect.",
+        name: "effect(377000)",
+        severity: "warning",
+      },
+    ];
+    wire.summary.errors = 0;
+    wire.summary.warnings = 1;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    expect(
+      normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+        {
+          absolute: "/workspace/src/main.ts",
+          relative: "src/main.ts",
+          source: 'const example = "@effect-diagnostics"',
+        },
+      ])
+    ).toEqual([]);
+  });
+});

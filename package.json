@@ -1,0 +1,56 @@
+{
+  "name": "@ocarinalabs/effect-doctor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Deterministic Effect TypeScript diagnostics for humans and coding-agent evaluations.",
+  "license": "MIT",
+  "bin": {
+    "effect-doctor": "./dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "audit": "fallow --fail-on-issues --threads 4",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "bun run lint && bun run typecheck && bun run test",
+    "doctor:self": "bun run build && node dist/bin.js . --format json",
+    "fix": "ultracite fix",
+    "lint": "ultracite check",
+    "prepack": "bun run build",
+    "setup:effect": "effect-tsgo patch --typescript --no-oxlint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0-rc.112",
+    "@effect/tsgo": "0.38.0",
+    "effect": "4.0.0-rc.112",
+    "oxlint": "1.80.0",
+    "oxlint-plugin-effect": "0.11.0",
+    "typescript": "7.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "fallow": "3.20.0",
+    "oxfmt": "0.65.0",
+    "ultracite": "7.10.7",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "packageManager": "bun@1.4.0"
+}

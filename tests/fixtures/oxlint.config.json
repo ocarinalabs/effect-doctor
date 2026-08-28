@@ -1,0 +1,6 @@
+{
+  "jsPlugins": ["../../node_modules/oxlint-plugin-effect/dist/plugin.js"],
+  "rules": {
+    "effect/noUnboundedRetry": "warn"
+  }
+}

@@ -1,0 +1,20 @@
+export { compareFindings } from "./delta.js";
+export { compareProjects, type CompareRequest } from "./compare.js";
+export type {
+  ComparisonReport,
+  EngineRun,
+  Finding,
+  FindingDelta,
+  FindingSummary,
+  ScanReport,
+} from "./model.js";
+export { ComparisonReportSchema, ScanReportSchema } from "./model.js";
+export { knownRules, type RuleMetadata } from "./rules.js";
+export {
+  isBlocked,
+  renderComparison,
+  renderScan,
+  type BlockingThreshold,
+  type OutputFormat,
+} from "./render.js";
+export { scanProject, type ScanRequest } from "./scan.js";
