@@ -21,7 +21,7 @@ export class AnalyzerFailure extends Schema.TaggedError<AnalyzerFailure>()(
 export class InvalidAnalyzerOutput extends Schema.TaggedError<InvalidAnalyzerOutput>()(
   "InvalidAnalyzerOutput",
   {
-    engine: Schema.Literals(["effect-tsgo", "effect-oxlint"]),
+    engine: Schema.Literals(["effect-tsgo", "effect-oxlint", "effect-doctor"]),
     message: Schema.String,
   }
 ) {}

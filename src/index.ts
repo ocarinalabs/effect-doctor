@@ -6,6 +6,7 @@ export type {
   Finding,
   FindingDelta,
   FindingSummary,
+  ProviderReceipt,
   ScanReport,
 } from "./model.js";
 export { ComparisonReportSchema, ScanReportSchema } from "./model.js";

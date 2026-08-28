@@ -10,10 +10,52 @@ import {
   scanProject,
 } from "../src/index.js";
 
-const fixture = (name: "clean" | "invalid"): string =>
+const fixture = (name: "clean" | "doctor" | "invalid"): string =>
   fileURLToPath(new URL(`fixtures/${name}`, import.meta.url));
 
 describe("scanProject", () => {
+  it("includes project-local declaration files in every provider receipt", async () => {
+    const report = await Effect.runPromise(
+      scanProject({ root: fixture("clean") })
+    );
+
+    expect(report.engines).toEqual([
+      {
+        analyzedFiles: [
+          "src/Z.ts",
+          "src/a.ts",
+          "src/environment.d.ts",
+          "src/main.ts",
+        ],
+        complete: true,
+        engine: "effect-doctor",
+        version: "0.0.0",
+      },
+      {
+        analyzedFiles: [
+          "src/Z.ts",
+          "src/a.ts",
+          "src/environment.d.ts",
+          "src/main.ts",
+        ],
+        complete: true,
+        engine: "effect-oxlint",
+        version: "0.11.0",
+      },
+      {
+        analyzedFiles: [
+          "src/Z.ts",
+          "src/a.ts",
+          "src/environment.d.ts",
+          "src/main.ts",
+        ],
+        complete: true,
+        engine: "effect-tsgo",
+        version: "0.38.0",
+      },
+    ]);
+  }, 30_000);
+
   it("combines type-aware and structural Effect diagnostics", async () => {
     const report = await Effect.runPromise(
       scanProject({ root: fixture("invalid") })
@@ -59,10 +101,65 @@ describe("scanProject", () => {
             nativeRuleId: "effect(noUnboundedRetry)",
           },
           ruleId: "effect/no-unbounded-retry",
-          severity: "advice",
+          severity: "error",
         }),
       ])
     );
+  }, 30_000);
+
+  it("runs every first-party rule without exposing the Oxlint canary", async () => {
+    const report = await Effect.runPromise(
+      scanProject({ root: fixture("doctor") })
+    );
+    const configFindings = report.findings.filter(
+      (finding) => finding.ruleId === "effect-doctor/prefer-config-redacted"
+    );
+
+    expect(configFindings.map((finding) => finding.evidence)).toEqual([
+      'Config.string("DATABASE_PASSWORD")',
+      'AppConfig.string("SERVICE_TOKEN")',
+      'EffectNamespace.Config.string("SIGNING_KEY")',
+      'ConfigModule.string("PRIVATE_KEY")',
+      'configString("API_SECRET")',
+      'Config.string(("PARENTHESIZED_SECRET"))',
+      'Config.string("ASSERTED_SECRET" as string)',
+      'Config.string("NON_NULL_SECRET"!)',
+      'Config.string(\n  "SATISFIES_SECRET" satisfies string\n)',
+      'Config.string(\n  <string>"TYPE_ASSERTION_SECRET"\n)',
+      "Config.string(`TEMPLATE_SECRET`)",
+      '((Config.string))("WRAPPED_CALLEE_SECRET")',
+    ]);
+    const suppressionFindings = report.findings.filter(
+      (finding) => finding.ruleId === "effect-doctor/diagnostic-suppression"
+    );
+    expect(suppressionFindings).toHaveLength(3);
+    expect(suppressionFindings.map((finding) => finding.evidence)).toContain(
+      "oxlint-disable effect-doctor/diagnostic-suppression"
+    );
+    expect(suppressionFindings.map((finding) => finding.evidence)).toContain(
+      "oxlint-disable-line effect-doctor/diagnostic-suppression"
+    );
+    expect(
+      suppressionFindings.some((finding) =>
+        finding.evidence.includes("imaginary/lookalike")
+      )
+    ).toBe(false);
+    expect(
+      report.findings.some((finding) => finding.ruleId.includes("canary"))
+    ).toBe(false);
+    expect(
+      configFindings.some((finding) =>
+        finding.evidence.includes("PUBLIC_API_KEY")
+      )
+    ).toBe(false);
+    expect(
+      configFindings.some((finding) => finding.evidence.includes("CLIENT_ID"))
+    ).toBe(false);
+    expect(
+      configFindings.some((finding) =>
+        finding.evidence.includes("LOCAL_SECRET")
+      )
+    ).toBe(false);
   }, 30_000);
 });
 

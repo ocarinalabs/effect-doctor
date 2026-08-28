@@ -1,4 +1,5 @@
 import { Buffer } from "node:buffer";
+import { resolve as resolvePath } from "node:path";
 
 import { FileSystem, Path, Effect } from "effect";
 
@@ -9,12 +10,19 @@ import {
 } from "../errors.js";
 import { fingerprintFinding } from "../fingerprint.js";
 import type {
-  EngineRun,
   Finding,
   FindingWithoutFingerprint,
+  ProviderReceipt,
 } from "../model.js";
-import { canonicalRuleId, effectOxlintRules, ruleTitle } from "../rules.js";
-import { TOOLCHAIN } from "../version.js";
+import {
+  doctorOxlintRules,
+  effectOxlintRules,
+  integrityOxlintRules,
+  ruleForDiagnostic,
+} from "../rules.js";
+import { DOCTOR_VERSION } from "../version.js";
+import { INTEGRITY_VISIT_MESSAGE } from "./doctor-plugin.js";
+import { compareCodeUnits } from "./order.js";
 import { decodeOxlintOutput } from "./oxlint-output.js";
 import type { OxlintDiagnostic } from "./oxlint-output.js";
 import { runProcess } from "./process.js";
@@ -31,19 +39,82 @@ const CONFIG_CATEGORIES = {
   suspicious: "off",
 } satisfies Readonly<Record<string, string>>;
 
-const makeConfig = (pluginPath: string): string =>
+const CANARY_CONFIG_RULE = "effect-doctor/__file-canary";
+const CANARY_DIAGNOSTIC_RULE = "effect-doctor(__file-canary)";
+const PRIMARY_RULE_COUNT =
+  Object.keys(effectOxlintRules).length +
+  Object.keys(doctorOxlintRules).length +
+  1;
+const INTEGRITY_RULE_COUNT = Object.keys(integrityOxlintRules).length;
+
+const makePrimaryConfig = (
+  effectPluginPath: string,
+  doctorPluginPath: string
+): string =>
   JSON.stringify({
     categories: CONFIG_CATEGORIES,
-    jsPlugins: [pluginPath],
+    jsPlugins: [effectPluginPath, doctorPluginPath],
     options: {
-      reportUnusedDisableDirectives: "warn",
+      reportUnusedDisableDirectives: "off",
       respectEslintDisableDirectives: true,
     },
-    rules: effectOxlintRules,
+    rules: {
+      ...effectOxlintRules,
+      ...doctorOxlintRules,
+      [CANARY_CONFIG_RULE]: "warn",
+    },
   });
 
-type OxlintAnalysis = {
+const makeIntegrityConfig = (doctorPluginPath: string): string =>
+  JSON.stringify({
+    categories: CONFIG_CATEGORIES,
+    jsPlugins: [doctorPluginPath],
+    options: {
+      reportUnusedDisableDirectives: "off",
+      respectEslintDisableDirectives: false,
+    },
+    rules: integrityOxlintRules,
+  });
+
+export type OxlintAnalysis = {
   readonly diagnostics: readonly OxlintDiagnostic[];
+};
+
+type OxlintProcessAnalysis = OxlintAnalysis & {
+  readonly numberOfRules: number;
+};
+
+export const oxlintProviderReceipts = (
+  root: string,
+  analysis: OxlintAnalysis,
+  sources: readonly AnalyzedSource[],
+  effectOxlintVersion: string
+): readonly ProviderReceipt[] => {
+  const sourceByAbsolute = new Map(
+    sources.map((source) => [source.absolute, source.relative])
+  );
+  const canaryFiles = analysis.diagnostics
+    .filter((diagnostic) => diagnostic.code === CANARY_DIAGNOSTIC_RULE)
+    .map((diagnostic) => {
+      const resolved = resolvePath(root, diagnostic.filename);
+      return sourceByAbsolute.get(resolved) ?? resolved;
+    })
+    .sort(compareCodeUnits);
+  const analyzedFiles = sources.map((source) => source.relative);
+  return [
+    {
+      analyzedFiles: canaryFiles,
+      complete: canaryFiles.length === sources.length,
+      engine: "effect-doctor",
+      version: DOCTOR_VERSION,
+    },
+    {
+      analyzedFiles,
+      complete: true,
+      engine: "effect-oxlint",
+      version: effectOxlintVersion,
+    },
+  ];
 };
 
 const makeArguments = (
@@ -65,23 +136,22 @@ const makeArguments = (
 
 const writeTemporaryConfig = Effect.fn("writeTemporaryOxlintConfig")(function* (
   root: string,
-  pluginPath: string
+  prefix: string,
+  contents: string
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const temporaryDirectory = yield* fs
-    .makeTempDirectoryScoped({ prefix: "effect-doctor-oxlint-" })
-    .pipe(
-      Effect.mapError(
-        () =>
-          new ProjectFailure({
-            message: "Unable to create an isolated Oxlint workspace",
-            root,
-          })
-      )
-    );
+  const temporaryDirectory = yield* fs.makeTempDirectoryScoped({ prefix }).pipe(
+    Effect.mapError(
+      () =>
+        new ProjectFailure({
+          message: "Unable to create an isolated Oxlint workspace",
+          root,
+        })
+    )
+  );
   const config = path.join(temporaryDirectory, "oxlint.config.json");
-  yield* fs.writeFileString(config, makeConfig(pluginPath)).pipe(
+  yield* fs.writeFileString(config, contents).pipe(
     Effect.mapError(
       () =>
         new ProjectFailure({
@@ -90,63 +160,150 @@ const writeTemporaryConfig = Effect.fn("writeTemporaryOxlintConfig")(function* (
         })
     )
   );
-  return config;
+  return { config, directory: temporaryDirectory };
 });
 
 const analyzeWithOxlint = Effect.fn("analyzeWithOxlint")(function* (
   toolchain: ToolchainPaths,
   root: string,
   config: string,
-  sources: readonly AnalyzedSource[]
+  sources: readonly AnalyzedSource[],
+  plannedRuleCount: number,
+  engine: "effect-oxlint" | "effect-doctor"
 ) {
   const result = yield* runProcess({
     arguments: makeArguments(toolchain, config, sources),
     cwd: root,
-    engine: "effect-oxlint",
+    engine,
     executable: process.execPath,
   });
   if (result.exitCode !== 0 && result.exitCode !== 1) {
     return yield* new AnalyzerFailure({
-      engine: "effect-oxlint",
+      engine,
       exitCode: result.exitCode,
       message: `Oxlint exited with code ${result.exitCode}`,
-      stderr: result.stderr,
+      stderr: "",
     });
   }
   const output = yield* Effect.try({
-    catch: (cause) =>
+    catch: () =>
       new InvalidAnalyzerOutput({
-        engine: "effect-oxlint",
-        message: `Invalid Oxlint output: ${String(cause)}`,
+        engine,
+        message: "Oxlint returned invalid analysis output.",
       }),
-    try: () => decodeOxlintOutput(result.stdout, sources.length),
+    try: () =>
+      decodeOxlintOutput(result.stdout, sources.length, plannedRuleCount),
   });
-  return { diagnostics: output.diagnostics } satisfies OxlintAnalysis;
+  return {
+    diagnostics: output.diagnostics,
+    numberOfRules: output.number_of_rules,
+  } satisfies OxlintProcessAnalysis;
 });
 
-const verifySourcesUnchanged = Effect.fn("verifySourcesUnchanged")(function* (
+const maskIntegritySource = (source: string): string => {
+  const masked = source.replaceAll("oxlint-disable", "oxlint_disable");
+  if (Buffer.byteLength(masked) !== Buffer.byteLength(source)) {
+    throw new Error("Integrity source masking changed byte offsets");
+  }
+  return masked;
+};
+
+const writeIntegritySources = Effect.fn("writeIntegritySources")(function* (
   root: string,
+  directory: string,
   sources: readonly AnalyzedSource[]
 ) {
   const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const mirrored: AnalyzedSource[] = [];
   for (const source of sources) {
-    const current = yield* fs.readFileString(source.absolute).pipe(
+    const absolute = path.join(directory, "sources", source.relative);
+    yield* fs.makeDirectory(path.dirname(absolute), { recursive: true }).pipe(
       Effect.mapError(
         () =>
           new ProjectFailure({
-            message: `Unable to verify analyzed source file: ${source.relative}`,
+            message: "Unable to create an isolated Oxlint workspace",
             root,
           })
       )
     );
-    if (current !== source.source) {
-      return yield* new ProjectFailure({
-        message: `Source changed during analysis: ${source.relative}`,
-        root,
+    const masked = yield* Effect.try({
+      catch: () =>
+        new ProjectFailure({
+          message: "Unable to prepare suppression integrity analysis",
+          root,
+        }),
+      try: () => maskIntegritySource(source.source),
+    });
+    yield* fs.writeFileString(absolute, masked).pipe(
+      Effect.mapError(
+        () =>
+          new ProjectFailure({
+            message: "Unable to prepare suppression integrity analysis",
+            root,
+          })
+      )
+    );
+    mirrored.push({ absolute, relative: source.relative, source: masked });
+  }
+  return mirrored;
+});
+
+const validateIntegrityAnalysis = Effect.fn("validateIntegrityAnalysis")(
+  function* (
+    root: string,
+    directory: string,
+    analysis: OxlintProcessAnalysis,
+    mirrored: readonly AnalyzedSource[],
+    originals: readonly AnalyzedSource[]
+  ) {
+    const path = yield* Path.Path;
+    if (analysis.numberOfRules !== INTEGRITY_RULE_COUNT) {
+      return yield* new InvalidAnalyzerOutput({
+        engine: "effect-doctor",
+        message: "Suppression integrity rules were not fully configured.",
       });
     }
+
+    const visits = analysis.diagnostics
+      .filter((diagnostic) => diagnostic.message === INTEGRITY_VISIT_MESSAGE)
+      .map((diagnostic) => path.resolve(directory, diagnostic.filename))
+      .sort(compareCodeUnits);
+    const expectedVisits = mirrored
+      .map((source) => source.absolute)
+      .sort(compareCodeUnits);
+    if (JSON.stringify(visits) !== JSON.stringify(expectedVisits)) {
+      return yield* new InvalidAnalyzerOutput({
+        engine: "effect-doctor",
+        message:
+          "Suppression integrity analysis did not visit every project file exactly once.",
+      });
+    }
+
+    const originalByMirror = new Map(
+      mirrored.map((source, index) => [
+        source.absolute,
+        originals[index]?.absolute,
+      ])
+    );
+    const diagnostics: OxlintDiagnostic[] = [];
+    for (const diagnostic of analysis.diagnostics) {
+      if (diagnostic.message === INTEGRITY_VISIT_MESSAGE) {
+        continue;
+      }
+      const mirroredPath = path.resolve(directory, diagnostic.filename);
+      const original = originalByMirror.get(mirroredPath);
+      if (original === undefined) {
+        return yield* new ProjectFailure({
+          message: "Suppression integrity analysis reported an unplanned file.",
+          root,
+        });
+      }
+      diagnostics.push({ ...diagnostic, filename: original });
+    }
+    return diagnostics;
   }
-});
+);
 
 export const runOxlint = Effect.fn("runOxlint")(function* (
   toolchain: ToolchainPaths,
@@ -155,15 +312,52 @@ export const runOxlint = Effect.fn("runOxlint")(function* (
 ) {
   return yield* Effect.scoped(
     Effect.gen(function* () {
-      const config = yield* writeTemporaryConfig(root, toolchain.effectPlugin);
-      const analysis = yield* analyzeWithOxlint(
-        toolchain,
+      const primary = yield* writeTemporaryConfig(
         root,
-        config,
+        "effect-doctor-oxlint-",
+        makePrimaryConfig(toolchain.effectPlugin, toolchain.doctorPlugin)
+      );
+      const integrity = yield* writeTemporaryConfig(
+        root,
+        "effect-doctor-integrity-",
+        makeIntegrityConfig(toolchain.doctorPlugin)
+      );
+      const mirrored = yield* writeIntegritySources(
+        root,
+        integrity.directory,
         sources
       );
-      yield* verifySourcesUnchanged(root, sources);
-      return analysis;
+      const [primaryAnalysis, integrityAnalysis] = yield* Effect.all(
+        [
+          analyzeWithOxlint(
+            toolchain,
+            root,
+            primary.config,
+            sources,
+            PRIMARY_RULE_COUNT,
+            "effect-oxlint"
+          ),
+          analyzeWithOxlint(
+            toolchain,
+            integrity.directory,
+            integrity.config,
+            mirrored,
+            INTEGRITY_RULE_COUNT,
+            "effect-doctor"
+          ),
+        ],
+        { concurrency: 2 }
+      );
+      const integrityDiagnostics = yield* validateIntegrityAnalysis(
+        root,
+        integrity.directory,
+        integrityAnalysis,
+        mirrored,
+        sources
+      );
+      return {
+        diagnostics: [...primaryAnalysis.diagnostics, ...integrityDiagnostics],
+      } satisfies OxlintAnalysis;
     })
   );
 });
@@ -212,17 +406,29 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
     const findings: Finding[] = [];
 
     for (const diagnostic of analysis.diagnostics) {
+      if (diagnostic.code === CANARY_DIAGNOSTIC_RULE) {
+        continue;
+      }
       const source = sourceForDiagnostic(root, path, diagnostic, sources);
       if (source === undefined) {
         return yield* new ProjectFailure({
-          message: `Oxlint reported an unplanned file: ${diagnostic.filename}`,
+          message: "Oxlint reported a file outside the project snapshot.",
           root,
+        });
+      }
+      const rule = ruleForDiagnostic(diagnostic.code);
+      if (rule === undefined || rule.source === "effect-tsgo") {
+        return yield* new InvalidAnalyzerOutput({
+          engine: diagnostic.code.startsWith("effect-doctor(")
+            ? "effect-doctor"
+            : "effect-oxlint",
+          message: `Oxlint emitted unknown diagnostic: ${diagnostic.code}`,
         });
       }
       const [{ span }] = diagnostic.labels;
       const evidence = extractEvidence(source.source, span.offset, span.length);
       const withoutFingerprint = {
-        category: "antipattern",
+        category: rule.category,
         evidence,
         location: {
           end: endPosition(span.line, span.column, evidence),
@@ -231,12 +437,15 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
         },
         message: diagnostic.message,
         provenance: {
-          engine: "effect-oxlint",
-          nativeRuleId: diagnostic.code,
+          engine: rule.source,
+          nativeRuleId:
+            rule.source === "effect-doctor"
+              ? rule.nativeRuleId
+              : diagnostic.code,
         },
-        ruleId: canonicalRuleId(diagnostic.code),
-        severity: "advice",
-        title: ruleTitle(diagnostic.code),
+        ruleId: rule.id,
+        severity: rule.defaultSeverity,
+        title: rule.title,
       } satisfies FindingWithoutFingerprint;
       findings.push({
         ...withoutFingerprint,
@@ -247,12 +456,3 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
     return findings;
   }
 );
-
-export const oxlintEngineRun = (
-  sources: readonly AnalyzedSource[]
-): EngineRun => ({
-  analyzedFiles: sources.map((source) => source.relative),
-  complete: true,
-  engine: "effect-oxlint",
-  version: TOOLCHAIN.effectOxlint,
-});

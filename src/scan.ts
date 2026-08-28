@@ -3,22 +3,31 @@ import { FileSystem, Path, Effect } from "effect";
 
 import { ProjectFailure } from "./errors.js";
 import type { DoctorFailure } from "./errors.js";
-import { analyzeDoctorRules, doctorEngineRun } from "./internal/doctor.js";
+import { compareCodeUnits } from "./internal/order.js";
 import {
   normalizeOxlintFindings,
-  oxlintEngineRun,
+  oxlintProviderReceipts,
   runOxlint,
 } from "./internal/oxlint.js";
+import {
+  makeProjectSnapshot,
+  verifyProjectSnapshot,
+} from "./internal/project-snapshot.js";
+import { validateProviderReceipts } from "./internal/provider-receipt.js";
 import { resolveToolchain } from "./internal/toolchain.js";
+import type { ToolchainVersions } from "./internal/toolchain.js";
 import {
   normalizeTsgoFindings,
   runTsgo,
-  tsgoEngineRun,
   validateTsgoFiles,
 } from "./internal/tsgo.js";
-import type { AnalyzedSource } from "./internal/tsgo.js";
-import type { Finding, FindingSummary, ScanReport } from "./model.js";
-import { DOCTOR_VERSION, TOOLCHAIN } from "./version.js";
+import type {
+  Finding,
+  FindingSummary,
+  ProviderReceipt,
+  ScanReport,
+} from "./model.js";
+import { DOCTOR_VERSION } from "./version.js";
 
 export type ScanRequest = {
   readonly root: string;
@@ -31,11 +40,11 @@ const summarize = (findings: readonly Finding[]): FindingSummary => ({
 });
 
 const compareFindings = (left: Finding, right: Finding): number =>
-  left.location.file.localeCompare(right.location.file) ||
+  compareCodeUnits(left.location.file, right.location.file) ||
   left.location.start.line - right.location.start.line ||
   left.location.start.column - right.location.start.column ||
-  left.ruleId.localeCompare(right.ruleId) ||
-  left.message.localeCompare(right.message);
+  compareCodeUnits(left.ruleId, right.ruleId) ||
+  compareCodeUnits(left.message, right.message);
 
 const resolveProjectRoot = Effect.fn("resolveProjectRoot")(function* (
   requestedRoot: string
@@ -75,21 +84,24 @@ const requireTsconfig = Effect.fn("requireTsconfig")(function* (root: string) {
 });
 
 const makeReport = (
-  sources: readonly AnalyzedSource[],
-  findings: readonly Finding[]
+  receipts: readonly ProviderReceipt[],
+  findings: readonly Finding[],
+  versions: ToolchainVersions
 ): ScanReport => ({
   doctorVersion: DOCTOR_VERSION,
-  engines: [
-    doctorEngineRun(sources),
-    oxlintEngineRun(sources),
-    tsgoEngineRun(sources),
-  ],
+  engines: receipts,
   findings,
   kind: "scan",
   root: ".",
   schema: "effect-doctor/scan/v1",
   summary: summarize(findings),
-  toolchain: TOOLCHAIN,
+  toolchain: {
+    effect: versions.effect,
+    effectOxlint: versions.effectOxlint,
+    oxlint: versions.oxlint,
+    tsgo: versions.tsgo,
+    typescript: versions.typescript,
+  },
 });
 
 const scanProjectWithServices = Effect.fn("scanProject")(function* (
@@ -98,20 +110,39 @@ const scanProjectWithServices = Effect.fn("scanProject")(function* (
   const root = yield* resolveProjectRoot(request.root);
   const tsconfig = yield* requireTsconfig(root);
   const toolchain = yield* resolveToolchain();
-  const tsgoAnalysis = yield* runTsgo(toolchain, tsconfig);
-  const sources = yield* validateTsgoFiles(root, tsgoAnalysis);
-  const oxlintAnalysis = yield* runOxlint(toolchain, root, sources);
+  const snapshot = yield* makeProjectSnapshot(
+    root,
+    tsconfig,
+    toolchain.tsgoExecutable
+  );
+  const [tsgoAnalysis, oxlintAnalysis] = yield* Effect.all(
+    [runTsgo(toolchain, tsconfig), runOxlint(toolchain, root, snapshot.files)],
+    { concurrency: 2 }
+  );
+  const tsgoReceipt = yield* validateTsgoFiles(
+    snapshot,
+    tsgoAnalysis,
+    toolchain.versions.tsgo
+  );
+  const receipts = yield* validateProviderReceipts(snapshot, [
+    ...oxlintProviderReceipts(
+      root,
+      oxlintAnalysis,
+      snapshot.files,
+      toolchain.versions.effectOxlint
+    ),
+    tsgoReceipt,
+  ]);
+  const sources = snapshot.files;
   const oxlintFindings = yield* normalizeOxlintFindings(
     root,
     oxlintAnalysis,
     sources
   );
-  const findings = [
-    ...analyzeDoctorRules(sources),
-    ...normalizeTsgoFindings(tsgoAnalysis, sources),
-    ...oxlintFindings,
-  ].sort(compareFindings);
-  return makeReport(sources, findings);
+  const tsgoFindings = yield* normalizeTsgoFindings(tsgoAnalysis, sources);
+  const findings = [...tsgoFindings, ...oxlintFindings].sort(compareFindings);
+  yield* verifyProjectSnapshot(snapshot, toolchain.tsgoExecutable);
+  return makeReport(receipts, findings, toolchain.versions);
 });
 
 export const scanProject = (

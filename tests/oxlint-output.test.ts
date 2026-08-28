@@ -52,6 +52,12 @@ describe("decodeOxlintOutput", () => {
     ).toThrowError(/planned file count/u);
   });
 
+  it("rejects an incomplete configured rule set", () => {
+    expect(() =>
+      decodeOxlintOutput(JSON.stringify(validOutput), 1, 98)
+    ).toThrowError(/planned rule count/u);
+  });
+
   it("rejects diagnostics without a source label", () => {
     const output = structuredClone(validOutput);
     const diagnostic = output.diagnostics.at(0);

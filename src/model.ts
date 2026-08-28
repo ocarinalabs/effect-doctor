@@ -21,8 +21,6 @@ const PositionSchema = Schema.Struct({
   column: PositiveInt,
   line: PositiveInt,
 });
-export type Position = typeof PositionSchema.Type;
-
 const SourceSpanSchema = Schema.Struct({
   end: PositionSchema,
   file: Schema.NonEmptyString,
@@ -47,13 +45,14 @@ export type Finding = typeof FindingSchema.Type;
 
 export type FindingWithoutFingerprint = Omit<Finding, "fingerprint">;
 
-const EngineRunSchema = Schema.Struct({
+const ProviderReceiptSchema = Schema.Struct({
   analyzedFiles: Schema.Array(Schema.NonEmptyString),
   complete: Schema.Boolean,
   engine: ProvenanceSchema.fields.engine,
   version: Schema.NonEmptyString,
 });
-export type EngineRun = typeof EngineRunSchema.Type;
+export type ProviderReceipt = typeof ProviderReceiptSchema.Type;
+export type EngineRun = ProviderReceipt;
 
 const FindingSummarySchema = Schema.Struct({
   advice: Schema.Natural,
@@ -64,7 +63,7 @@ export type FindingSummary = typeof FindingSummarySchema.Type;
 
 export const ScanReportSchema = Schema.Struct({
   doctorVersion: Schema.NonEmptyString,
-  engines: Schema.Array(EngineRunSchema),
+  engines: Schema.Array(ProviderReceiptSchema),
   findings: Schema.Array(FindingSchema),
   kind: Schema.Literal("scan"),
   root: Schema.Literal("."),
