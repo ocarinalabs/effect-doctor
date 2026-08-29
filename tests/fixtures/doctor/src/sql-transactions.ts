@@ -18,6 +18,11 @@ export const managedTransaction = Effect.gen(function* () {
   return yield* sql.withTransaction(sql`SELECT 1`);
 });
 
+export function* nonDelegatingGenerator() {
+  const sql = yield SqlClient.SqlClient;
+  return sql`BEGIN`;
+}
+
 const sql = String.raw;
 
 export const unrelatedTemplate = sql`BEGIN`;

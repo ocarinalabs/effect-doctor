@@ -44,7 +44,9 @@ const yieldedExpression = (
     return undefined;
   }
   const node = unwrapExpression(expression);
-  return node.type === "YieldExpression" && node.argument !== null
+  return node.type === "YieldExpression" &&
+    node.delegate &&
+    node.argument !== null
     ? unwrapExpression(node.argument)
     : undefined;
 };
