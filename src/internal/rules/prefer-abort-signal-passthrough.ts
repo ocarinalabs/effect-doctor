@@ -27,29 +27,47 @@ const propertyName = (property: ESTree.ObjectProperty): string | undefined => {
     : undefined;
 };
 
-const isPromiseAdapterCallback = (
+const directAdapterName = (
   context: Context,
   bindings: ReadonlyMap<number, EffectImportBinding>,
   adapterFunction: PromiseAdapterFunction
-): boolean => {
+): string | undefined => {
   const { parent } = adapterFunction;
-  if (
-    parent.type === "CallExpression" &&
-    parent.arguments[0] === adapterFunction
-  ) {
-    const adapter = effectExportName(context, bindings, parent.callee);
-    return adapter === "promise" || adapter === "tryPromise";
+  if (parent.type !== "CallExpression") {
+    return undefined;
   }
+  return parent.arguments[0] === adapterFunction
+    ? effectExportName(context, bindings, parent.callee)
+    : undefined;
+};
+
+const tryPromiseOptionsFor = (
+  adapterFunction: PromiseAdapterFunction
+): ESTree.ObjectExpression | undefined => {
+  const { parent } = adapterFunction;
   if (
     parent.type !== "Property" ||
     parent.value !== adapterFunction ||
     parent.kind !== "init" ||
     propertyName(parent) !== "try"
   ) {
-    return false;
+    return undefined;
   }
   const options = parent.parent;
-  if (options.type !== "ObjectExpression") {
+  return options.type === "ObjectExpression" ? options : undefined;
+};
+
+const isPromiseAdapterCallback = (
+  context: Context,
+  bindings: ReadonlyMap<number, EffectImportBinding>,
+  adapterFunction: PromiseAdapterFunction
+): boolean => {
+  const directAdapter = directAdapterName(context, bindings, adapterFunction);
+  if (directAdapter === "promise" || directAdapter === "tryPromise") {
+    return true;
+  }
+  const options = tryPromiseOptionsFor(adapterFunction);
+  if (options === undefined) {
     return false;
   }
   const adapterCall = options.parent;

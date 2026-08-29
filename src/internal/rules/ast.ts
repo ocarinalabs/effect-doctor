@@ -27,9 +27,8 @@ const isImportDeclaration = (
   statement: ESTree.Program["body"][number]
 ): statement is ImportDeclaration => statement.type === "ImportDeclaration";
 
-export const moduleExportName = (
-  node: ESTree.ModuleExportName
-): string | undefined => (node.type === "Identifier" ? node.name : node.value);
+const moduleExportName = (node: ESTree.ModuleExportName): string | undefined =>
+  node.type === "Identifier" ? node.name : node.value;
 
 export const unwrapExpression = (
   initial: ESTree.Expression
