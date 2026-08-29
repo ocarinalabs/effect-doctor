@@ -34,7 +34,7 @@ Use `--blocking error`, `--blocking warning`, or `--blocking never` to select th
 
 Effect Doctor does not enable the entire community lint preset. Blanket bans on `async`, nullish values, ternaries, globals, Node adapters, or `try/catch` are team conventions, not universal evidence that Effect code is wrong.
 
-The checked-in catalog contains all 141 known rules: 99 Effect TSGo rules, all 40 `oxlint-plugin-effect` rules, and 2 first-party Effect Doctor rules. It is also the only source used to build provider configuration, normalize findings, and implement `rules list` and `rules explain`. Of those rules, 45 are enabled by default: the 28 upstream TSGo defaults, 15 curated Oxlint rules, and both first-party rules.
+The checked-in catalog contains all 146 known rules: 99 Effect TSGo rules, all 40 `oxlint-plugin-effect` rules, and 7 first-party Effect Doctor rules. It is also the only source used to build provider configuration, normalize findings, and implement `rules list` and `rules explain`. Of those rules, 50 are enabled by default: the 28 upstream TSGo defaults, 15 curated Oxlint rules, and all 7 first-party rules.
 
 The default Oxlint profile is deliberately narrower. Seven strong safety checks block at error severity:
 

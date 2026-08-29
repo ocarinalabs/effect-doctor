@@ -41,7 +41,7 @@ The generated typed `RuleCatalog` is authoritative. It contains all 99 diagnosti
 
 The network-free build lever is `scripts/rule-catalog.mjs`. Its default input is the checked-in exact TSGo metadata artifact. `bun run catalog:check` compares generated output with that input and the installed TSGo schema and Oxlint rule inventory. `bun run catalog:generate` deterministically rewrites the generated table. An explicit local TSGo reference checkout may be supplied with `--reference`; refreshing the vendored input additionally requires `--refresh-input`.
 
-Catalog membership and default policy are separate. A rule can be known while disabled. Effect Doctor enables upstream TSGo's 28 error/warning defaults, 15 broadly applicable Oxlint rules, and 2 first-party advisory rules. Preview rules, checks delegated to TSGo, and subjective policy bans stay visible without silently becoming project requirements.
+Catalog membership and default policy are separate. A rule can be known while disabled. Effect Doctor enables upstream TSGo's 28 error/warning defaults, 15 broadly applicable Oxlint rules, and 7 first-party advisory rules. Preview rules, checks delegated to TSGo, and subjective policy bans stay visible without silently becoming project requirements.
 
 Full presets are not enabled blindly because bans on syntax such as `async`, `try/catch`, ternaries, nullish values, globals, or Node imports often encode a team's local conventions rather than evidence of an Effect defect. A smaller default profile gives blocking severity a defensible meaning.
 

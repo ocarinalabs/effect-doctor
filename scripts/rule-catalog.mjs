@@ -375,6 +375,26 @@ const makeDoctorEntries = () => [
     title: "No Run Sync On Suspending Effect",
   },
   {
+    category: "resource-safety",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Forward Effect's AbortSignal when adapting a directly cancellable fetch promise.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(prefer-abort-signal-passthrough)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/prefer-abort-signal-passthrough",
+    nativeRuleId: "prefer-abort-signal-passthrough",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/prefer-abort-signal-passthrough",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "Prefer Abort Signal Passthrough",
+  },
+  {
     category: "security",
     defaultEnabled: true,
     defaultSeverity: "advice",
@@ -451,7 +471,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 6,
+    "effect-doctor": 7,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -495,7 +515,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    49
+    50
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);

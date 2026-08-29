@@ -9,12 +9,35 @@ import { scanProject } from "../src/index.js";
 const fixture = fileURLToPath(new URL("fixtures/doctor", import.meta.url));
 const report = Effect.runPromise(scanProject({ root: fixture }));
 
+const EXPECTED_FIRST_PARTY_RULES = [
+  "effect-doctor/diagnostic-suppression",
+  "effect-doctor/no-manual-sql-transaction",
+  "effect-doctor/no-run-sync-on-suspending-effect",
+  "effect-doctor/prefer-abort-signal-passthrough",
+  "effect-doctor/prefer-config-redacted",
+  "effect-doctor/prefer-http-json-response",
+  "effect-doctor/prefer-structured-log-data",
+] as const;
+
 const findingsFor = async (ruleId: string): Promise<readonly Finding[]> => {
   const result = await report;
   return result.findings.filter((finding) => finding.ruleId === ruleId);
 };
 
 describe("first-party rule liveness", () => {
+  it("keeps every enabled public first-party rule live", async () => {
+    const result = await report;
+    const liveRules = [
+      ...new Set(
+        result.findings
+          .filter((finding) => finding.provenance.engine === "effect-doctor")
+          .map((finding) => finding.ruleId)
+      ),
+    ].sort();
+
+    expect(liveRules).toEqual(EXPECTED_FIRST_PARTY_RULES);
+  });
+
   it("reports only directly proven suspending effects at synchronous runners", async () => {
     const findings = await findingsFor(
       "effect-doctor/no-run-sync-on-suspending-effect"
@@ -53,6 +76,16 @@ describe("first-party rule liveness", () => {
       "sql`BEGIN`",
       "sql`COMMIT`",
       "database`ROLLBACK`",
+    ]);
+  });
+
+  it("reports direct fetch adapters that discard Effect cancellation", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/prefer-abort-signal-passthrough"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      'fetch("https://example.com/missing")',
+      'fetch("https://example.com/object", { method: "GET" })',
     ]);
   });
 });

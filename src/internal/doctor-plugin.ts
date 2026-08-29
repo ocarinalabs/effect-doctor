@@ -5,6 +5,7 @@ import { diagnosticSuppressionIntegrity } from "./rules/diagnostic-suppression.t
 import { fileCanary } from "./rules/file-canary.ts";
 import { noManualSqlTransaction } from "./rules/no-manual-sql-transaction.ts";
 import { noRunSyncOnSuspendingEffect } from "./rules/no-run-sync-on-suspending-effect.ts";
+import { preferAbortSignalPassthrough } from "./rules/prefer-abort-signal-passthrough.ts";
 import { preferConfigRedacted } from "./rules/prefer-config-redacted.ts";
 import { preferHttpJsonResponse } from "./rules/prefer-http-json-response.ts";
 import { preferStructuredLogData } from "./rules/prefer-structured-log-data.ts";
@@ -18,6 +19,7 @@ export const doctorPluginRules = {
   "__diagnostic-suppression-integrity": diagnosticSuppressionIntegrity,
   "no-manual-sql-transaction": noManualSqlTransaction,
   "no-run-sync-on-suspending-effect": noRunSyncOnSuspendingEffect,
+  "prefer-abort-signal-passthrough": preferAbortSignalPassthrough,
   "prefer-config-redacted": preferConfigRedacted,
   "prefer-http-json-response": preferHttpJsonResponse,
   "prefer-structured-log-data": preferStructuredLogData,
