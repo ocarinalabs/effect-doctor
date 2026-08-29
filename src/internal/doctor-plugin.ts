@@ -5,6 +5,7 @@ import { diagnosticSuppressionIntegrity } from "./rules/diagnostic-suppression.t
 import { fileCanary } from "./rules/file-canary.ts";
 import { noRunSyncOnSuspendingEffect } from "./rules/no-run-sync-on-suspending-effect.ts";
 import { preferConfigRedacted } from "./rules/prefer-config-redacted.ts";
+import { preferStructuredLogData } from "./rules/prefer-structured-log-data.ts";
 
 const CANARY_RULE = "__file-canary";
 
@@ -15,6 +16,7 @@ export const doctorPluginRules = {
   "__diagnostic-suppression-integrity": diagnosticSuppressionIntegrity,
   "no-run-sync-on-suspending-effect": noRunSyncOnSuspendingEffect,
   "prefer-config-redacted": preferConfigRedacted,
+  "prefer-structured-log-data": preferStructuredLogData,
 } satisfies Readonly<Record<string, Rule>>;
 
 export default eslintCompatPlugin({

@@ -148,6 +148,10 @@ export const isUnshadowedGlobal = (
   context: Context,
   identifier: ESTree.IdentifierReference,
   name: string
-): boolean =>
-  identifier.name === name &&
-  variableForReference(context, identifier) === undefined;
+): boolean => {
+  if (identifier.name !== name) {
+    return false;
+  }
+  const variable = variableForReference(context, identifier);
+  return variable === undefined || variable.defs.length === 0;
+};

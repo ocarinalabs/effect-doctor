@@ -24,4 +24,14 @@ describe("first-party rule liveness", () => {
       'runSyncExit(sleep("1 millis"))',
     ]);
   });
+
+  it("reports unnecessary JSON serialization at Effect logging boundaries", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/prefer-structured-log-data"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "JSON.stringify(payload)",
+      "JSON.stringify(payload)",
+    ]);
+  });
 });

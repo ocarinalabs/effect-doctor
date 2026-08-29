@@ -76,6 +76,30 @@ export const GENERATED_RULE_CATALOG = [
   },
   {
     "category": "effect-native",
+    "defaultEnabled": true,
+    "defaultSeverity": "advice",
+    "description": "Pass structured values directly to Effect logging instead of serializing them first.",
+    "diagnosticCodes": [],
+    "diagnosticRuleIds": [
+      "effect-doctor(prefer-structured-log-data)"
+    ],
+    "execution": "oxlint",
+    "fixable": false,
+    "id": "effect-doctor/prefer-structured-log-data",
+    "nativeRuleId": "prefer-structured-log-data",
+    "providerDefaultSeverity": "warning",
+    "providerRuleId": "effect-doctor/prefer-structured-log-data",
+    "selection": "advise",
+    "source": "effect-doctor",
+    "status": "advisory",
+    "supportedEffectVersions": [
+      "v3",
+      "v4"
+    ],
+    "title": "Prefer Structured Log Data"
+  },
+  {
+    "category": "effect-native",
     "defaultEnabled": false,
     "defaultSeverity": "advice",
     "description": "Warns when manually constructing AbortController inside Effect generators instead of using Effect.abortSignal",

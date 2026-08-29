@@ -374,6 +374,26 @@ const makeDoctorEntries = () => [
     supportedEffectVersions: ["v3", "v4"],
     title: "Prefer Config Redacted",
   },
+  {
+    category: "effect-native",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Pass structured values directly to Effect logging instead of serializing them first.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(prefer-structured-log-data)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/prefer-structured-log-data",
+    nativeRuleId: "prefer-structured-log-data",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/prefer-structured-log-data",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v3", "v4"],
+    title: "Prefer Structured Log Data",
+  },
 ];
 
 const sortEntries = (entries) =>
@@ -391,7 +411,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 3,
+    "effect-doctor": 4,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -435,7 +455,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    46
+    47
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);
