@@ -11,7 +11,9 @@ const report = Effect.runPromise(scanProject({ root: fixture }));
 
 const EXPECTED_FIRST_PARTY_RULES = [
   "effect-doctor/diagnostic-suppression",
+  "effect-doctor/no-long-lived-layer-acquisition",
   "effect-doctor/no-manual-sql-transaction",
+  "effect-doctor/no-network-in-sql-transaction",
   "effect-doctor/no-run-sync-on-suspending-effect",
   "effect-doctor/prefer-abort-signal-passthrough",
   "effect-doctor/prefer-config-redacted",
@@ -88,6 +90,32 @@ describe("first-party rule liveness", () => {
       "sql`BEGIN`",
       "sql`COMMIT`",
       "database`ROLLBACK`",
+    ]);
+  });
+
+  it("reports direct network effects held inside an Effect SQL transaction", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-network-in-sql-transaction"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      'fetch("https://example.com/in-transaction", { signal })',
+      'fetch("https://example.com/try-in-transaction", { signal })',
+      'HttpClient.get("https://example.com/in-transaction")',
+      'httpGet("https://example.com/named-in-transaction")',
+      'fetch("https://example.com/generator-in-transaction", { signal })',
+      'HttpClient.get("https://example.com/gen")',
+    ]);
+  });
+
+  it("reports provably long-lived work run inline during Layer acquisition", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-long-lived-layer-acquisition"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "Effect.never",
+      "Effect.forever(Effect.succeed(Worker.of({ run: Effect.void })))",
+      "Stream.runDrain(Stream.never)",
+      "Effect.never",
     ]);
   });
 

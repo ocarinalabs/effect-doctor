@@ -128,6 +128,30 @@ export const identifierHasBinding = <Binding>(
   );
 };
 
+export const importedExportName = (
+  context: Context,
+  bindings: ReadonlyMap<number, string>,
+  expression: ESTree.Expression
+): string | undefined => {
+  const node = unwrapExpression(expression);
+  if (node.type === "Identifier") {
+    const binding = bindingForReference(context, bindings, node);
+    return binding === "*" ? undefined : binding;
+  }
+  if (
+    node.type !== "MemberExpression" ||
+    node.computed ||
+    node.property.type !== "Identifier"
+  ) {
+    return undefined;
+  }
+  const owner = unwrapExpression(node.object);
+  return owner.type === "Identifier" &&
+    bindingForReference(context, bindings, owner) === "*"
+    ? node.property.name
+    : undefined;
+};
+
 export const namedMember = (
   expression: ESTree.Expression,
   name: string
@@ -141,6 +165,32 @@ export const namedMember = (
     return undefined;
   }
   return node;
+};
+
+export const staticPropertyName = (
+  property: ESTree.ObjectProperty
+): string | undefined => {
+  if (property.key.type === "Identifier" && !property.computed) {
+    return property.key.name;
+  }
+  return property.key.type === "Literal" &&
+    typeof property.key.value === "string"
+    ? property.key.value
+    : undefined;
+};
+
+export const delegatedYield = (
+  expression: ESTree.Expression | null
+): ESTree.Expression | undefined => {
+  if (expression === null) {
+    return undefined;
+  }
+  const node = unwrapExpression(expression);
+  return node.type === "YieldExpression" &&
+    node.delegate &&
+    node.argument !== null
+    ? unwrapExpression(node.argument)
+    : undefined;
 };
 
 export const isUnshadowedGlobal = (

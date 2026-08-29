@@ -1,12 +1,15 @@
 import type { Context, ESTree } from "@oxlint/plugins";
 
-import { bindingForReference, unwrapExpression } from "./ast.ts";
+import { importedExportName } from "./ast.ts";
 
 export type EffectImportBinding = "*" | string;
 
 const EFFECT_MODULES = ["effect", "effect/Effect"] as const;
 
 const EFFECT_EXPORTS = [
+  "forever",
+  "forkScoped",
+  "gen",
   "log",
   "logDebug",
   "logError",
@@ -39,22 +42,4 @@ export const effectExportName = (
   context: Context,
   bindings: ReadonlyMap<number, EffectImportBinding>,
   expression: ESTree.Expression
-): string | undefined => {
-  const node = unwrapExpression(expression);
-  if (node.type === "Identifier") {
-    const binding = bindingForReference(context, bindings, node);
-    return binding === "*" ? undefined : binding;
-  }
-  if (
-    node.type !== "MemberExpression" ||
-    node.computed ||
-    node.property.type !== "Identifier"
-  ) {
-    return undefined;
-  }
-  const owner = unwrapExpression(node.object);
-  return owner.type === "Identifier" &&
-    bindingForReference(context, bindings, owner) === "*"
-    ? node.property.name
-    : undefined;
-};
+): string | undefined => importedExportName(context, bindings, expression);

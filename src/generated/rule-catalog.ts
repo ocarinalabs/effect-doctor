@@ -31,6 +31,29 @@ export const GENERATED_RULE_CATALOG = [
     "category": "resource-safety",
     "defaultEnabled": true,
     "defaultSeverity": "advice",
+    "description": "Fork provably long-lived work into the Layer scope instead of blocking acquisition.",
+    "diagnosticCodes": [],
+    "diagnosticRuleIds": [
+      "effect-doctor(no-long-lived-layer-acquisition)"
+    ],
+    "execution": "oxlint",
+    "fixable": false,
+    "id": "effect-doctor/no-long-lived-layer-acquisition",
+    "nativeRuleId": "no-long-lived-layer-acquisition",
+    "providerDefaultSeverity": "warning",
+    "providerRuleId": "effect-doctor/no-long-lived-layer-acquisition",
+    "selection": "advise",
+    "source": "effect-doctor",
+    "status": "advisory",
+    "supportedEffectVersions": [
+      "v4"
+    ],
+    "title": "No Long Lived Layer Acquisition"
+  },
+  {
+    "category": "resource-safety",
+    "defaultEnabled": true,
+    "defaultSeverity": "advice",
     "description": "Use Effect SQL transaction ownership instead of sending transaction-control statements manually.",
     "diagnosticCodes": [],
     "diagnosticRuleIds": [
@@ -49,6 +72,29 @@ export const GENERATED_RULE_CATALOG = [
       "v4"
     ],
     "title": "No Manual SQL Transaction"
+  },
+  {
+    "category": "resource-safety",
+    "defaultEnabled": true,
+    "defaultSeverity": "advice",
+    "description": "Keep direct HTTP work outside Effect SQL transaction effects.",
+    "diagnosticCodes": [],
+    "diagnosticRuleIds": [
+      "effect-doctor(no-network-in-sql-transaction)"
+    ],
+    "execution": "oxlint",
+    "fixable": false,
+    "id": "effect-doctor/no-network-in-sql-transaction",
+    "nativeRuleId": "no-network-in-sql-transaction",
+    "providerDefaultSeverity": "warning",
+    "providerRuleId": "effect-doctor/no-network-in-sql-transaction",
+    "selection": "advise",
+    "source": "effect-doctor",
+    "status": "advisory",
+    "supportedEffectVersions": [
+      "v4"
+    ],
+    "title": "No Network In SQL Transaction"
   },
   {
     "category": "correctness",

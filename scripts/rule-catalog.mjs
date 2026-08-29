@@ -339,6 +339,26 @@ const makeDoctorEntries = () => [
     defaultEnabled: true,
     defaultSeverity: "advice",
     description:
+      "Fork provably long-lived work into the Layer scope instead of blocking acquisition.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-long-lived-layer-acquisition)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-long-lived-layer-acquisition",
+    nativeRuleId: "no-long-lived-layer-acquisition",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-long-lived-layer-acquisition",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Long Lived Layer Acquisition",
+  },
+  {
+    category: "resource-safety",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
       "Use Effect SQL transaction ownership instead of sending transaction-control statements manually.",
     diagnosticCodes: [],
     diagnosticRuleIds: ["effect-doctor(no-manual-sql-transaction)"],
@@ -353,6 +373,26 @@ const makeDoctorEntries = () => [
     status: "advisory",
     supportedEffectVersions: ["v4"],
     title: "No Manual SQL Transaction",
+  },
+  {
+    category: "resource-safety",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Keep direct HTTP work outside Effect SQL transaction effects.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-network-in-sql-transaction)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-network-in-sql-transaction",
+    nativeRuleId: "no-network-in-sql-transaction",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-network-in-sql-transaction",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Network In SQL Transaction",
   },
   {
     category: "correctness",
@@ -471,7 +511,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 7,
+    "effect-doctor": 9,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -515,7 +555,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    50
+    52
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);
