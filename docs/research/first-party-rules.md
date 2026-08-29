@@ -1,8 +1,8 @@
 # First-party rule contracts
 
-Research and calibration date: 2026-08-29
+Research and calibration date: 2026-08-30
 
-Effect Doctor currently catalogs 146 rules: 99 from `@effect/tsgo`, 40 from `oxlint-plugin-effect`, and 7 first-party rules. The first-party rules are deliberately small, import-aware, and advisory. They fill contracts that are either outside an upstream provider or narrower than an upstream policy rule; they do not try to make the catalog look large. Effect source links below are pinned to the installed `effect@4.0.0-rc.112` release commit, `2600f62f4532026928454dcea8d1c48557b3f942`.
+Effect Doctor currently catalogs 148 rules: 99 from `@effect/tsgo`, 40 from `oxlint-plugin-effect`, and 9 first-party rules. The first-party rules are deliberately small, import-aware, and advisory. They fill contracts that are either outside an upstream provider or narrower than an upstream policy rule; they do not try to make the catalog look large. Effect source links below are pinned to the installed `effect@4.0.0-rc.112` release commit, `2600f62f4532026928454dcea8d1c48557b3f942`.
 
 ## Admission standard
 
@@ -26,13 +26,15 @@ Type-aware contracts stay in TSGo. Broad style preferences stay out. Unknown loc
 | `prefer-structured-log-data` | A one-argument global `JSON.stringify` is passed directly to an Effect logger, discarding the original structured value before the logger sees it. | Formatted serialization, non-Effect loggers, shadowed `JSON`, and JSON at storage or wire boundaries. | Effect logging accepts [one or more values](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Effect.ts#L22190-L22221), and its structured logger preserves the [message as structured data](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Logger.ts#L655-L685). |
 | `prefer-http-json-response` | `HttpServerResponse.text(JSON.stringify(value))` manually creates a JSON-shaped text response instead of using the Effect JSON boundary. | Formatted text, existing JSON responses, unrelated response builders, and shadowed `JSON`. | Effect's [`text`](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/unstable/http/HttpServerResponse.ts#L190-L210) and failure-aware [`json`](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/unstable/http/HttpServerResponse.ts#L299-L330) constructors. |
 | `no-manual-sql-transaction` | A value proven to be the Effect `SqlClient` service sends a static transaction-control statement itself, bypassing Effect's transaction owner. | Unrelated SQL tags, ordinary query text, managed `withTransaction`, dynamic SQL, and values not proven to be the imported client service. | `SqlClient.withTransaction` owns the [transaction boundary](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/unstable/sql/SqlClient.ts#L39-L62) and its implementation wires [begin, commit, rollback, and savepoints](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/unstable/sql/SqlClient.ts#L147-L170). |
+| `no-network-in-sql-transaction` | A direct global fetch adapter or Effect `HttpClient` accessor is inside the transaction effect of a lexically proven Effect `SqlClient`. | Indirect Effect values and service methods, unproven SQL clients, unrelated methods, deferred function values, nested callbacks, and HTTP completed before the transaction. | `SqlClient.withTransaction` owns the [transaction effect boundary](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/unstable/sql/SqlClient.ts#L39-L62); the MIT-licensed Kit Effect skill independently states the [external-I/O boundary rule](https://github.com/kitlangton/skills/blob/22c35cb7fd29f931789253fc3c8eb142f2863a8a/skills/effect/SKILL.md#boundary-rules). |
+| `no-long-lived-layer-acquisition` | A Layer acquisition directly runs work proven never to finish normally: `Effect.never`, `Effect.forever`, or a consumer of `Stream.never` / `Stream.forever`, including a direct top-level delegated yield. | Indirect values, finite or unknown streams, forked work, nested service members, unrelated modules, and any lifetime that local syntax cannot prove. | `Layer.effectDiscard` [runs its Effect during construction](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Layer.ts#L1483-L1513), while Effect defines [`never`](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Effect.ts#L1672-L1691) and [`forever`](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Effect.ts#L14462-L14502) as non-terminating work. Effect's own durable worker layer uses [`Effect.forkScoped`](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/unstable/workflow/DurableQueue.ts#L342-L363). |
 | `prefer-abort-signal-passthrough` | A direct global `fetch` with a literal URL is returned from `Effect.promise` or `Effect.tryPromise`, and its request options definitively omit `signal`; Effect interruption therefore cannot cancel that request. | `Request` inputs, opaque or spread options, an existing `signal` property, dynamic URLs, nested callbacks, local `fetch` bindings, and non-Effect adapters. | Effect promise adapters receive an [`AbortSignal`](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Effect.ts#L1290-L1334), and interruption stops the operation only when it [observes the signal](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Effect.ts#L1350-L1408). Effect Solutions independently demonstrates the [signal-preserving adapter shape](https://github.com/kitlangton/effect-solutions/blob/09f82e6c5c928e7232cd32daf04d7c6a830b63f7/packages/website/docs/14-use-pattern.md#the-pattern). |
 
 The executable positive and adversarial cases live in [`tests/fixtures/doctor`](../../tests/fixtures/doctor), and [`first-party-liveness.test.ts`](../../tests/first-party-liveness.test.ts) asserts that every enabled public first-party identity fires through the packaged `scanProject` seam.
 
 ## Candidate decisions
 
-Seven independently phrased candidates were checked against current Effect source in this iteration. Five became the narrow rules above; two were rejected.
+The original seven independently phrased candidates produced five narrow rules and two rejections. The later complete Kit Effect skill audit added two narrow resource-safety rules; all other guidance mapped to an upstream owner or remained human design guidance.
 
 | Candidate | Decision | Reason |
 | --- | --- | --- |
@@ -41,6 +43,8 @@ Seven independently phrased candidates were checked against current Effect sourc
 | JSON string passed to an Effect text response | Accept narrowly | The first-party JSON response constructor captures serialization failure and content type. |
 | Manual transaction control through a proven Effect SQL client | Accept narrowly | `withTransaction` owns connection, commit, rollback, savepoint, and interruption behavior. |
 | Direct fetch adapter that definitively omits a signal | Accept narrowly | The promise adapter's cancellation contract is explicit. Arbitrary Promise APIs are not flagged because support for `AbortSignal` cannot be inferred syntactically. |
+| Direct HTTP work inside a proven Effect SQL transaction | Accept narrowly | The transaction owner and direct network operation are both locally evident. Indirect calls abstain because their implementation and execution timing are unknown. |
+| Proven never-ending work run as Layer acquisition | Accept narrowly | A Layer cannot finish building while its acquisition effect is still running. The rule recognizes only explicit non-termination and leaves unknown lifetimes alone. |
 | Immediate `forkChild` followed by `Fiber.join` | Reject | Effect's own [`forkChild` example](https://github.com/Effect-TS/effect/blob/2600f62f4532026928454dcea8d1c48557b3f942/packages/effect/src/Effect.ts#L16940-L16990) uses this exact shape. It can also carry supervision and concurrency semantics that are not equivalent to simple sequencing. |
 | Always replace Vitest callbacks with `it.effect` | Reject | `it.effect` is useful, but dependency choice is project policy. TSGo already blocks the actual correctness failure with `floatingEffectInVitest` and explicitly permits either an Effect-aware test API or `Effect.runPromise`. |
 
@@ -48,16 +52,16 @@ Related TSGo rules remain authoritative: `runEffectInsideEffect`, `preferUnsafeC
 
 ## Pinned corpus calibration
 
-Every row below produced a complete three-provider report. The file count is the maximum analyzed-file receipt across the providers. Calibration considers the five new rules in this iteration; the two older rules retain their own fixtures and prior review history.
+Every row below produced a complete three-provider report. The file count is the maximum analyzed-file receipt across the providers. The 2026-08-30 pass specifically checked both rules admitted from the Kit skill audit; every existing first-party rule retained its executable fixture and prior review history.
 
 | Corpus | Revision | Configured TypeScript files | New-rule findings |
 | --- | --- | ---: | ---: |
-| Effect Doctor | this branch | 50 | 0 |
+| Effect Doctor | this branch | 55 | 0 |
 | Effect `packages/effect` | `df431ae72235ad7156901caa30b053688ab40a17` | 437 | 0 |
 | Effect Solutions website | `09f82e6c5c928e7232cd32daf04d7c6a830b63f7` | 62 | 0 |
-| EffectBench: context, runner, doctor, CLI, protocol, results | `ab1b349f042b6c3c413f7aec4558a5f1308599e6` | 65 | 0 |
-| Feather: Effect ACP, Codex app server, shared | `e476b625b92ad16116e2d1e3bbb46a672ee62b2b` | 43 | 0 |
-| **Total** |  | **657** | **0** |
+| EffectBench working tree: context, runner, doctor, CLI, protocol, results | base `ab1b349f042b6c3c413f7aec4558a5f1308599e6` | 65 | 0 |
+| Feather: Effect ACP, Codex app server, shared | `a0664aa53b6972f76d444224e545e09c86d384ea` | 43 | 0 |
+| **Total** |  | **662** | **0** |
 
 The same reports contained 81 `diagnostic-suppression` findings, each tied to an actual directive: 64 in Effect, 12 in Effect Solutions, and 5 in EffectBench. That rule intentionally makes suppressions visible; it does not claim each suppression is unjustified. No other first-party rule fired on this corpus.
 
