@@ -104,7 +104,7 @@ const makeReport = (
   },
 });
 
-const scanProjectWithServices = Effect.fn("scanProject")(function* (
+const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
   request: ScanRequest
 ) {
   const root = yield* resolveProjectRoot(request.root);

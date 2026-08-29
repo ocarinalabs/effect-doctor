@@ -1,5 +1,7 @@
 import type { Context, ESTree, Variable } from "@oxlint/plugins";
 
+export type FunctionBoundary = ESTree.ArrowFunctionExpression | ESTree.Function;
+
 type TransparentExpression = Extract<
   ESTree.Expression,
   { readonly expression: ESTree.Expression }
@@ -39,6 +41,19 @@ export const unwrapExpression = (
   }
   return node;
 };
+
+export const containsNode = (
+  container: ESTree.Node,
+  node: ESTree.Node
+): boolean =>
+  container.range[0] <= node.range[0] && container.range[1] >= node.range[1];
+
+export const isFunctionBoundary = (
+  node: ESTree.Node
+): node is FunctionBoundary =>
+  node.type === "ArrowFunctionExpression" ||
+  node.type === "FunctionExpression" ||
+  node.type === "FunctionDeclaration";
 
 export const staticString = (
   node: ESTree.Argument | undefined

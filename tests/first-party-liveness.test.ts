@@ -10,11 +10,17 @@ const fixture = fileURLToPath(new URL("fixtures/doctor", import.meta.url));
 const report = Effect.runPromise(scanProject({ root: fixture }));
 
 const EXPECTED_FIRST_PARTY_RULES = [
+  "effect-doctor/consistent-effect-fn-name",
   "effect-doctor/diagnostic-suppression",
+  "effect-doctor/no-duplicate-layer-factory-call",
+  "effect-doctor/no-inline-schema-compile",
   "effect-doctor/no-long-lived-layer-acquisition",
   "effect-doctor/no-manual-sql-transaction",
+  "effect-doctor/no-multiple-callback-resume",
+  "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
   "effect-doctor/no-network-in-sql-transaction",
   "effect-doctor/no-run-sync-on-suspending-effect",
+  "effect-doctor/no-unredacted-value-in-diagnostic",
   "effect-doctor/prefer-abort-signal-passthrough",
   "effect-doctor/prefer-config-redacted",
   "effect-doctor/prefer-http-json-response",
@@ -48,6 +54,86 @@ describe("first-party rule liveness", () => {
     ].sort();
 
     expect(liveRules).toEqual(EXPECTED_FIRST_PARTY_RULES);
+  });
+
+  it("reports Effect.fn span names that disagree with their assigned names", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/consistent-effect-fn-name"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      'Fx.fn("fetchUser")',
+      'traced("writeUser")',
+      'EffectModule.fn("removeUser")',
+      'EffectPackage.Effect.fn("reloadUser")',
+    ]);
+  });
+
+  it("reports repeated Layer factories inside one composition graph", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-duplicate-layer-factory-call"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "databaseLayer()",
+      "cacheLayer()",
+      "serviceLayer()",
+      "databaseLayer()",
+      "databaseLayer()",
+    ]);
+  });
+
+  it("reports fresh closed schemas compiled inside functions", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-inline-schema-compile"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "RootSchema.decodeUnknownSync(\n    RootSchema.Struct({ name: RootSchema.String })\n  )",
+      "SchemaNamespace.is(SchemaNamespace.Array(SchemaNamespace.Number))",
+      "directSchemaDecode(\n    SchemaNamespace.Tuple([SchemaNamespace.String, SchemaNamespace.Number])\n  )",
+      "(\n    RootParser as typeof RootParser & {\n      readonly decodeUnknownOption: typeof RootSchema.decodeUnknownOption;\n    }\n  ).decodeUnknownOption(RootSchema.Record(RootSchema.String, RootSchema.Int))",
+      'ParserNamespace.encodeUnknownResult(\n    SchemaNamespace.Literals(["open", "closed"])\n  )',
+      "directParserDecode(RootSchema.NonEmptyArray(RootSchema.String))",
+      "RootSchema.decodeUnknownSync(\n    RootSchema.Struct({ wrapped: RootSchema.Boolean }) satisfies RootSchema.Top\n  )",
+      'SchemaNamespace.decodeUnknownSync(\n    SchemaNamespace.Struct({\n      records: SchemaNamespace.Array(\n        SchemaNamespace.Union([\n          SchemaNamespace.Tuple([\n            SchemaNamespace.Literal("entry"),\n            SchemaNamespace.Number,\n          ]),\n          SchemaNamespace.Literal(true),\n        ])\n      ),\n    })\n  )',
+      "RootSchema.decodeUnknownSync(\n    RootSchema.Struct({ stable: StableLeaf })\n  )",
+      'directSchemaEncode(RootSchema.Literal("ready"))',
+    ]);
+  });
+
+  it("reports repeated straight-line Effect.callback resumes", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-multiple-callback-resume"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      'resume(Fx.succeed("second"))',
+      "complete(Fx.succeed(second))",
+      "resume(Fx.void)",
+      "finish(Fx.succeed(false))",
+      "finish(Fx.succeed(true))",
+    ]);
+  });
+
+  it("reports direct mutation after an unsafe Chunk wrap", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-mutation-after-unsafe-chunk-wrap"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "pushed.push(4)",
+      "assigned[0] = 4",
+      "updated[0]++",
+      "sorted.sort((left, right) => left - right)",
+    ]);
+  });
+
+  it("reports direct Redacted.value exposure in diagnostic sinks", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-unredacted-value-in-diagnostic"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "Redacted.value(secret)",
+      "RedactedModule.value(secret)",
+      "revealSecret(secret)",
+      "revealSecret(secret)",
+    ]);
   });
 
   it("reports only directly proven suspending effects at synchronous runners", async () => {

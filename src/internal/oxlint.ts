@@ -134,7 +134,7 @@ const makeArguments = (
   ...sources.map((source) => source.absolute),
 ];
 
-const writeTemporaryConfig = Effect.fn("writeTemporaryOxlintConfig")(function* (
+const writeTemporaryConfig = Effect.fn("writeTemporaryConfig")(function* (
   root: string,
   prefix: string,
   contents: string

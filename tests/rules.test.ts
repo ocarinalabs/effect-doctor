@@ -39,7 +39,7 @@ describe("the public rule inventory", () => {
   it("exposes the exhaustive pinned provider catalog", () => {
     const rules = knownRules();
 
-    expect(rules).toHaveLength(148);
+    expect(rules).toHaveLength(154);
     expect(rules.filter((rule) => rule.source === "effect-tsgo")).toHaveLength(
       99
     );
@@ -48,9 +48,9 @@ describe("the public rule inventory", () => {
     ).toHaveLength(40);
     expect(
       rules.filter((rule) => rule.source === "effect-doctor")
-    ).toHaveLength(9);
-    expect(new Set(rules.map((rule) => rule.id)).size).toBe(148);
-    expect(rules.filter((rule) => rule.defaultEnabled)).toHaveLength(52);
+    ).toHaveLength(15);
+    expect(new Set(rules.map((rule) => rule.id)).size).toBe(154);
+    expect(rules.filter((rule) => rule.defaultEnabled)).toHaveLength(58);
   });
 
   it("preserves the pinned TSGo metadata distribution", () => {
@@ -93,7 +93,7 @@ describe("the public rule inventory", () => {
       )
     ).toHaveLength(28);
     expect(Object.keys(effectOxlintRules)).toHaveLength(15);
-    expect(Object.keys(doctorOxlintRules)).toHaveLength(8);
+    expect(Object.keys(doctorOxlintRules)).toHaveLength(14);
     expect(Object.keys(integrityOxlintRules)).toHaveLength(1);
   });
 

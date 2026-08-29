@@ -3,11 +3,14 @@ import type { Context, ESTree } from "@oxlint/plugins";
 
 import {
   collectImportBindings,
+  containsNode,
   importedExportName,
+  isFunctionBoundary,
   isUnshadowedGlobal,
   namedMember,
   unwrapExpression,
 } from "./ast.ts";
+import type { FunctionBoundary } from "./ast.ts";
 import { effectGeneratorFunction } from "./effect-generator.ts";
 import type { EffectGeneratorFunction } from "./effect-generator.ts";
 import { EFFECT_IMPORT_BINDINGS } from "./effect-imports.ts";
@@ -62,22 +65,9 @@ const isGlobalFetch = (
   );
 };
 
-const contains = (container: ESTree.Node, node: ESTree.Node): boolean =>
-  container.range[0] <= node.range[0] && container.range[1] >= node.range[1];
-
-const isFunctionBoundary = (
-  node: ESTree.Node
-): node is ESTree.ArrowFunctionExpression | ESTree.Function =>
-  node.type === "ArrowFunctionExpression" ||
-  node.type === "FunctionExpression" ||
-  node.type === "FunctionDeclaration";
-
 type TransactionContext = {
   readonly argument: ESTree.Expression;
-  readonly functionBoundaries: readonly (
-    | ESTree.ArrowFunctionExpression
-    | ESTree.Function
-  )[];
+  readonly functionBoundaries: readonly FunctionBoundary[];
 };
 
 const ownedTransactionArgument = (
@@ -106,10 +96,7 @@ const enclosingTransaction = (
   node: ESTree.CallExpression,
   ownsSqlClient: (expression: ESTree.Expression) => boolean
 ): TransactionContext | undefined => {
-  const functionBoundaries: (
-    | ESTree.ArrowFunctionExpression
-    | ESTree.Function
-  )[] = [];
+  const functionBoundaries: FunctionBoundary[] = [];
   let ancestor: ESTree.Node | null = node.parent;
   while (ancestor !== null) {
     if (isFunctionBoundary(ancestor)) {
@@ -117,7 +104,7 @@ const enclosingTransaction = (
     }
     if (ancestor.type === "CallExpression") {
       const argument = ownedTransactionArgument(ancestor, ownsSqlClient);
-      if (argument !== undefined && contains(argument, node)) {
+      if (argument !== undefined && containsNode(argument, node)) {
         return { argument, functionBoundaries };
       }
     }
@@ -127,7 +114,7 @@ const enclosingTransaction = (
 };
 
 const isAllowedBoundary = (
-  boundary: ESTree.ArrowFunctionExpression | ESTree.Function,
+  boundary: FunctionBoundary,
   promiseAdapter: PromiseAdapterFunction | undefined,
   generatorFunction: EffectGeneratorFunction | undefined
 ): boolean => boundary === promiseAdapter || boundary === generatorFunction;

@@ -312,6 +312,26 @@ const makeOxlintEntries = () =>
 
 const makeDoctorEntries = () => [
   {
+    category: "effect-native",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Keep unqualified Effect.fn span names consistent with their assigned function names.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(consistent-effect-fn-name)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/consistent-effect-fn-name",
+    nativeRuleId: "consistent-effect-fn-name",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/consistent-effect-fn-name",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "Consistent Effect Fn Name",
+  },
+  {
     category: "antipattern",
     defaultEnabled: true,
     defaultSeverity: "advice",
@@ -339,6 +359,46 @@ const makeDoctorEntries = () => [
     defaultEnabled: true,
     defaultSeverity: "advice",
     description:
+      "Reuse a zero-argument Layer factory result within one composition graph unless the duplicate is explicitly fresh.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-duplicate-layer-factory-call)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-duplicate-layer-factory-call",
+    nativeRuleId: "no-duplicate-layer-factory-call",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-duplicate-layer-factory-call",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Duplicate Layer Factory Call",
+  },
+  {
+    category: "resource-safety",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Reuse closed Effect v4 schemas and parser adapters outside repeated function execution.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-inline-schema-compile)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-inline-schema-compile",
+    nativeRuleId: "no-inline-schema-compile",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-inline-schema-compile",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Inline Schema Compile",
+  },
+  {
+    category: "resource-safety",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
       "Fork provably long-lived work into the Layer scope instead of blocking acquisition.",
     diagnosticCodes: [],
     diagnosticRuleIds: ["effect-doctor(no-long-lived-layer-acquisition)"],
@@ -353,6 +413,46 @@ const makeDoctorEntries = () => [
     status: "advisory",
     supportedEffectVersions: ["v4"],
     title: "No Long Lived Layer Acquisition",
+  },
+  {
+    category: "correctness",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Call an Effect.callback continuation at most once on a straight-line path.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-multiple-callback-resume)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-multiple-callback-resume",
+    nativeRuleId: "no-multiple-callback-resume",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-multiple-callback-resume",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Multiple Callback Resume",
+  },
+  {
+    category: "correctness",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Prevent direct mutation of arrays shared with Chunk.fromArrayUnsafe.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-mutation-after-unsafe-chunk-wrap)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
+    nativeRuleId: "no-mutation-after-unsafe-chunk-wrap",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Mutation After Unsafe Chunk Wrap",
   },
   {
     category: "resource-safety",
@@ -373,6 +473,26 @@ const makeDoctorEntries = () => [
     status: "advisory",
     supportedEffectVersions: ["v4"],
     title: "No Manual SQL Transaction",
+  },
+  {
+    category: "security",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Prevent Redacted.value from exposing secrets directly inside logs and errors.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-unredacted-value-in-diagnostic)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-unredacted-value-in-diagnostic",
+    nativeRuleId: "no-unredacted-value-in-diagnostic",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-unredacted-value-in-diagnostic",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Unredacted Value In Diagnostic",
   },
   {
     category: "resource-safety",
@@ -511,7 +631,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 9,
+    "effect-doctor": 15,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -555,7 +675,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    52
+    58
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);

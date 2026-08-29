@@ -91,7 +91,7 @@ describe("Effect Doctor CLI", () => {
     const result = runCliArguments(["rules", "list"]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim().split("\n")).toHaveLength(148);
+    expect(result.stdout.trim().split("\n")).toHaveLength(154);
     expect(result.stdout).toContain(
       "effect/no-unbounded-retry\terror\tenabled\tblocking\tenforce\teffect-oxlint"
     );
