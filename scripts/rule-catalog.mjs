@@ -394,6 +394,26 @@ const makeDoctorEntries = () => [
     supportedEffectVersions: ["v3", "v4"],
     title: "Prefer Structured Log Data",
   },
+  {
+    category: "correctness",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Use Effect's JSON response constructor instead of stringifying into a text response.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(prefer-http-json-response)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/prefer-http-json-response",
+    nativeRuleId: "prefer-http-json-response",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/prefer-http-json-response",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "Prefer HTTP JSON Response",
+  },
 ];
 
 const sortEntries = (entries) =>
@@ -411,7 +431,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 4,
+    "effect-doctor": 5,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -455,7 +475,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    47
+    48
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);

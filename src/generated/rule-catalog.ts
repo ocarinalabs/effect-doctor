@@ -75,6 +75,29 @@ export const GENERATED_RULE_CATALOG = [
     "title": "Prefer Config Redacted"
   },
   {
+    "category": "correctness",
+    "defaultEnabled": true,
+    "defaultSeverity": "advice",
+    "description": "Use Effect's JSON response constructor instead of stringifying into a text response.",
+    "diagnosticCodes": [],
+    "diagnosticRuleIds": [
+      "effect-doctor(prefer-http-json-response)"
+    ],
+    "execution": "oxlint",
+    "fixable": false,
+    "id": "effect-doctor/prefer-http-json-response",
+    "nativeRuleId": "prefer-http-json-response",
+    "providerDefaultSeverity": "warning",
+    "providerRuleId": "effect-doctor/prefer-http-json-response",
+    "selection": "advise",
+    "source": "effect-doctor",
+    "status": "advisory",
+    "supportedEffectVersions": [
+      "v4"
+    ],
+    "title": "Prefer HTTP JSON Response"
+  },
+  {
     "category": "effect-native",
     "defaultEnabled": true,
     "defaultSeverity": "advice",

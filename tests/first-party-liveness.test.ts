@@ -34,4 +34,14 @@ describe("first-party rule liveness", () => {
       "JSON.stringify(payload)",
     ]);
   });
+
+  it("reports JSON strings passed to text response constructors", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/prefer-http-json-response"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "JSON.stringify(payload)",
+      "JSON.stringify(payload)",
+    ]);
+  });
 });
