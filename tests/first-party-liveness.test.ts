@@ -25,6 +25,16 @@ const findingsFor = async (ruleId: string): Promise<readonly Finding[]> => {
 };
 
 describe("first-party rule liveness", () => {
+  it("keeps runtime-proven synchronous controls outside the rule", () => {
+    expect(
+      Effect.runSync(
+        Effect.callback<number>((resume) => resume(Effect.succeed(1)))
+      )
+    ).toBe(1);
+    expect(Effect.runSync(Effect.sleep(0))).toBeUndefined();
+    expect(Effect.runSync(Effect.yieldNow)).toBeUndefined();
+  });
+
   it("keeps every enabled public first-party rule live", async () => {
     const result = await report;
     const liveRules = [
@@ -45,6 +55,8 @@ describe("first-party rule liveness", () => {
     expect(findings.map((finding) => finding.evidence)).toEqual([
       "Effect.runSync(\n  Effect.promise(() => Promise.resolve(1))\n)",
       'runSyncExit(sleep("1 millis"))',
+      "Effect.runSync(\n  tryPromise(() => Promise.resolve(2))\n)",
+      "runSyncExit(Effect.never)",
     ]);
   });
 

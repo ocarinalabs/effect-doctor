@@ -7,7 +7,6 @@ export type EffectImportBinding = "*" | string;
 const EFFECT_MODULES = ["effect", "effect/Effect"] as const;
 
 const EFFECT_EXPORTS = [
-  "callback",
   "log",
   "logDebug",
   "logError",
@@ -21,7 +20,6 @@ const EFFECT_EXPORTS = [
   "runSyncExit",
   "sleep",
   "tryPromise",
-  "yieldNow",
 ] as const;
 
 export const EFFECT_IMPORT_BINDINGS: ReadonlyMap<string, EffectImportBinding> =

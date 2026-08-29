@@ -7,12 +7,11 @@ import type { EffectImportBinding } from "./effect-imports.ts";
 
 const SYNC_RUNNERS: ReadonlySet<string> = new Set(["runSync", "runSyncExit"]);
 const SUSPENDING_CALLS: ReadonlySet<string> = new Set([
-  "callback",
   "promise",
-  "sleep",
   "tryPromise",
 ]);
-const SUSPENDING_VALUES: ReadonlySet<string> = new Set(["never", "yieldNow"]);
+const POSITIVE_INTEGER_DURATION =
+  /^(?:[1-9]\d*)\s+(?:nanos?|micros?|millis?|seconds?|minutes?|hours?|days?|weeks?)$/u;
 
 const expressionArgument = (
   argument: ESTree.Argument | undefined
@@ -20,6 +19,26 @@ const expressionArgument = (
   argument === undefined || argument.type === "SpreadElement"
     ? undefined
     : unwrapExpression(argument);
+
+const isPositiveSleepDuration = (
+  argument: ESTree.Argument | undefined
+): boolean => {
+  const duration = expressionArgument(argument);
+  if (duration?.type !== "Literal") {
+    return false;
+  }
+  if (typeof duration.value === "number") {
+    return Number.isFinite(duration.value) && duration.value >= 0.000001;
+  }
+  if (typeof duration.value === "bigint") {
+    return duration.value > 0n;
+  }
+  return (
+    typeof duration.value === "string" &&
+    (duration.value === "Infinity" ||
+      POSITIVE_INTEGER_DURATION.test(duration.value))
+  );
+};
 
 const isKnownSuspendingEffect = (
   context: Context,
@@ -29,10 +48,13 @@ const isKnownSuspendingEffect = (
   const node = unwrapExpression(expression);
   if (node.type === "CallExpression") {
     const name = effectExportName(context, bindings, node.callee);
+    if (name === "sleep") {
+      return isPositiveSleepDuration(node.arguments[0]);
+    }
     return name !== undefined && SUSPENDING_CALLS.has(name);
   }
   const name = effectExportName(context, bindings, node);
-  return name !== undefined && SUSPENDING_VALUES.has(name);
+  return name === "never";
 };
 
 export const noRunSyncOnSuspendingEffect = defineRule({
@@ -64,7 +86,7 @@ export const noRunSyncOnSuspendingEffect = defineRule({
           return;
         }
         context.report({
-          message: `${runner} cannot complete an Effect that is known to suspend; use an asynchronous runner at this boundary.`,
+          message: `${runner} cannot successfully evaluate an Effect that is known to suspend; use an asynchronous runner at this boundary.`,
           node,
         });
       },
