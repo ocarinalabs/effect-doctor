@@ -44,4 +44,15 @@ describe("first-party rule liveness", () => {
       "JSON.stringify(payload)",
     ]);
   });
+
+  it("reports transaction control sent through an Effect SQL statement", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-manual-sql-transaction"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      "sql`BEGIN`",
+      "sql`COMMIT`",
+      "database`ROLLBACK`",
+    ]);
+  });
 });

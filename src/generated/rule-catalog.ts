@@ -28,6 +28,29 @@ export const GENERATED_RULE_CATALOG = [
     "title": "Diagnostic Suppression"
   },
   {
+    "category": "resource-safety",
+    "defaultEnabled": true,
+    "defaultSeverity": "advice",
+    "description": "Use Effect SQL transaction ownership instead of sending transaction-control statements manually.",
+    "diagnosticCodes": [],
+    "diagnosticRuleIds": [
+      "effect-doctor(no-manual-sql-transaction)"
+    ],
+    "execution": "oxlint",
+    "fixable": false,
+    "id": "effect-doctor/no-manual-sql-transaction",
+    "nativeRuleId": "no-manual-sql-transaction",
+    "providerDefaultSeverity": "warning",
+    "providerRuleId": "effect-doctor/no-manual-sql-transaction",
+    "selection": "advise",
+    "source": "effect-doctor",
+    "status": "advisory",
+    "supportedEffectVersions": [
+      "v4"
+    ],
+    "title": "No Manual SQL Transaction"
+  },
+  {
     "category": "correctness",
     "defaultEnabled": true,
     "defaultSeverity": "advice",

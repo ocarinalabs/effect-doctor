@@ -335,6 +335,26 @@ const makeDoctorEntries = () => [
     title: "Diagnostic Suppression",
   },
   {
+    category: "resource-safety",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Use Effect SQL transaction ownership instead of sending transaction-control statements manually.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-manual-sql-transaction)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-manual-sql-transaction",
+    nativeRuleId: "no-manual-sql-transaction",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-manual-sql-transaction",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Manual SQL Transaction",
+  },
+  {
     category: "correctness",
     defaultEnabled: true,
     defaultSeverity: "advice",
@@ -431,7 +451,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 5,
+    "effect-doctor": 6,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -475,7 +495,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    48
+    49
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);

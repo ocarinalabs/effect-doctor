@@ -3,6 +3,7 @@ import type { Rule } from "@oxlint/plugins";
 
 import { diagnosticSuppressionIntegrity } from "./rules/diagnostic-suppression.ts";
 import { fileCanary } from "./rules/file-canary.ts";
+import { noManualSqlTransaction } from "./rules/no-manual-sql-transaction.ts";
 import { noRunSyncOnSuspendingEffect } from "./rules/no-run-sync-on-suspending-effect.ts";
 import { preferConfigRedacted } from "./rules/prefer-config-redacted.ts";
 import { preferHttpJsonResponse } from "./rules/prefer-http-json-response.ts";
@@ -15,6 +16,7 @@ export { INTEGRITY_VISIT_MESSAGE } from "./rules/diagnostic-suppression.ts";
 export const doctorPluginRules = {
   [CANARY_RULE]: fileCanary,
   "__diagnostic-suppression-integrity": diagnosticSuppressionIntegrity,
+  "no-manual-sql-transaction": noManualSqlTransaction,
   "no-run-sync-on-suspending-effect": noRunSyncOnSuspendingEffect,
   "prefer-config-redacted": preferConfigRedacted,
   "prefer-http-json-response": preferHttpJsonResponse,
