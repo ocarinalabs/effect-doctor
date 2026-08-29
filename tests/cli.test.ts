@@ -91,7 +91,7 @@ describe("Effect Doctor CLI", () => {
     const result = runCliArguments(["rules", "list"]);
 
     expect(result.status).toBe(0);
-    expect(result.stdout.trim().split("\n")).toHaveLength(154);
+    expect(result.stdout.trim().split("\n")).toHaveLength(155);
     expect(result.stdout).toContain(
       "effect/no-unbounded-retry\terror\tenabled\tblocking\tenforce\teffect-oxlint"
     );
@@ -112,6 +112,8 @@ describe("Effect Doctor CLI", () => {
     expect(result.stdout).toContain("Status: advisory");
     expect(result.stdout).toContain("Selection: advise");
     expect(result.stdout).toContain("Category: security");
-    expect(result.stdout).toContain("Description: Prefer Config.redacted");
+    expect(result.stdout).toContain(
+      "Description: Redact statically named secret configuration values at construction."
+    );
   });
 });

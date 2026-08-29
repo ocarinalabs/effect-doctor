@@ -7,6 +7,10 @@ export type EffectImportBinding = "*" | string;
 const EFFECT_MODULES = ["effect", "effect/Effect"] as const;
 
 const EFFECT_EXPORTS = [
+  "annotateCurrentSpan",
+  "annotateLogs",
+  "annotateLogsScoped",
+  "annotateSpans",
   "forever",
   "forkScoped",
   "gen",

@@ -479,7 +479,7 @@ const makeDoctorEntries = () => [
     defaultEnabled: true,
     defaultSeverity: "advice",
     description:
-      "Prevent Redacted.value from exposing secrets directly inside logs and errors.",
+      "Prevent Redacted.value from exposing secrets directly inside diagnostic and telemetry sinks.",
     diagnosticCodes: [],
     diagnosticRuleIds: ["effect-doctor(no-unredacted-value-in-diagnostic)"],
     execution: "oxlint",
@@ -535,6 +535,26 @@ const makeDoctorEntries = () => [
     title: "No Run Sync On Suspending Effect",
   },
   {
+    category: "correctness",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Keep escaping exceptions out of confirmed Effect generator bodies.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-throw-in-effect-generator)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-throw-in-effect-generator",
+    nativeRuleId: "no-throw-in-effect-generator",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-throw-in-effect-generator",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Throw In Effect Generator",
+  },
+  {
     category: "resource-safety",
     defaultEnabled: true,
     defaultSeverity: "advice",
@@ -559,7 +579,7 @@ const makeDoctorEntries = () => [
     defaultEnabled: true,
     defaultSeverity: "advice",
     description:
-      "Prefer Config.redacted for statically named secret configuration values.",
+      "Redact statically named secret configuration values at construction.",
     diagnosticCodes: [],
     diagnosticRuleIds: ["effect-doctor(prefer-config-redacted)"],
     execution: "oxlint",
@@ -631,7 +651,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 15,
+    "effect-doctor": 16,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -675,7 +695,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    58
+    59
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);

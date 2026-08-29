@@ -12,6 +12,7 @@ import { noMultipleCallbackResume } from "./rules/no-multiple-callback-resume.ts
 import { noMutationAfterUnsafeChunkWrap } from "./rules/no-mutation-after-unsafe-chunk-wrap.ts";
 import { noNetworkInSqlTransaction } from "./rules/no-network-in-sql-transaction.ts";
 import { noRunSyncOnSuspendingEffect } from "./rules/no-run-sync-on-suspending-effect.ts";
+import { noThrowInEffectGenerator } from "./rules/no-throw-in-effect-generator.ts";
 import { noUnredactedValueInDiagnostic } from "./rules/no-unredacted-value-in-diagnostic.ts";
 import { preferAbortSignalPassthrough } from "./rules/prefer-abort-signal-passthrough.ts";
 import { preferConfigRedacted } from "./rules/prefer-config-redacted.ts";
@@ -34,6 +35,7 @@ export const doctorPluginRules = {
   "no-mutation-after-unsafe-chunk-wrap": noMutationAfterUnsafeChunkWrap,
   "no-network-in-sql-transaction": noNetworkInSqlTransaction,
   "no-run-sync-on-suspending-effect": noRunSyncOnSuspendingEffect,
+  "no-throw-in-effect-generator": noThrowInEffectGenerator,
   "no-unredacted-value-in-diagnostic": noUnredactedValueInDiagnostic,
   "prefer-abort-signal-passthrough": preferAbortSignalPassthrough,
   "prefer-config-redacted": preferConfigRedacted,

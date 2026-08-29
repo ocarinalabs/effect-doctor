@@ -34,7 +34,7 @@ Use `--blocking error`, `--blocking warning`, or `--blocking never` to select th
 
 Effect Doctor does not enable the entire community lint preset. Blanket bans on `async`, nullish values, ternaries, globals, Node adapters, or `try/catch` are team conventions, not universal evidence that Effect code is wrong.
 
-The checked-in catalog contains all 154 known rules: 99 Effect TSGo rules, all 40 `oxlint-plugin-effect` rules, and 15 first-party Effect Doctor rules. It is also the only source used to build provider configuration, normalize findings, and implement `rules list` and `rules explain`. Of those rules, 58 are enabled by default: the 28 upstream TSGo defaults, 15 curated Oxlint rules, and all 15 first-party rules.
+The checked-in catalog contains all 155 known rules: 99 Effect TSGo rules, all 40 `oxlint-plugin-effect` rules, and 16 first-party Effect Doctor rules. It is also the only source used to build provider configuration, normalize findings, and implement `rules list` and `rules explain`. Of those rules, 59 are enabled by default: the 28 upstream TSGo defaults, 15 curated Oxlint rules, and all 16 first-party rules.
 
 The default Oxlint profile is deliberately narrower. Seven strong safety checks block at error severity:
 
@@ -47,7 +47,7 @@ The default Oxlint profile is deliberately narrower. Seven strong safety checks 
 
 Eight broadly useful conventions remain non-blocking advice: module-mock avoidance, object-parameter review, sequential `Effect.all` review, tagged-error helpers, exhaustive tagged matching, tagged predicates, `ServiceMap.Service` construction, and named Effect functions. Preview, TSGo-delegated, and policy-only Oxlint rules remain visible but disabled.
 
-First-party advice inventories diagnostic suppressions and covers narrowly provable configuration, runtime, logging, HTTP, SQL, Layer identity/lifetime, callback, Chunk aliasing, Schema compilation, tracing-name, and redaction mistakes. A hidden primary-pass file canary is never reported; it proves that Oxlint executed the JavaScript plugin exactly once over every planned source file. Suppression integrity uses a separate directive-immune Oxlint pass so a disable directive cannot hide itself.
+First-party advice inventories diagnostic suppressions and covers narrowly provable configuration, runtime, Effect-generator failure, logging, telemetry, HTTP, SQL, Layer identity/lifetime, callback, Chunk aliasing, Schema compilation, tracing-name, and redaction mistakes. A hidden primary-pass file canary is never reported; it proves that Oxlint executed the JavaScript plugin exactly once over every planned source file. Suppression integrity uses a separate directive-immune Oxlint pass so a disable directive cannot hide itself.
 
 Provider rule names are preserved in `provenance`; Effect Doctor also maps them to stable public rule IDs. First-party rules require adversarial valid and invalid fixtures before they can become blocking diagnostics.
 
@@ -62,6 +62,8 @@ See [the architecture guide](docs/architecture.md) for catalog ownership, snapsh
 See [the first-party rule contracts](docs/research/first-party-rules.md) for official provenance, deliberate abstentions, rejected candidates, adversarial fixtures, and pinned-corpus calibration.
 
 See [the Kit Effect skill audit](docs/research/kit-effect-skill-audit.md) for the recommendation-by-recommendation ownership and enforceability decisions.
+
+See [the additional guidance audit](docs/research/ecosystem/additional-guidance-rule-audit.md) for the complete Effect Solutions, Joel Hooks, Biome, and Betalyra PR inventory and the admitted, delegated, rejected, and research-only dispositions.
 
 ## Development
 

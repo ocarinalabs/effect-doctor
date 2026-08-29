@@ -128,6 +128,11 @@ describe("scanProject", () => {
       'Config.string(\n  <string>"TYPE_ASSERTION_SECRET"\n)',
       "Config.string(`TEMPLATE_SECRET`)",
       '((Config.string))("WRAPPED_CALLEE_SECRET")',
+      'Config.schema(\n  Schema.String,\n  "SCHEMA_PASSWORD"\n)',
+      'AppConfig.schema(\n  Schema.NonEmptyString,\n  "SCHEMA_TOKEN"\n)',
+      'EffectNamespace.Config.schema(\n  EffectNamespace.Schema.String,\n  "PACKAGE_SECRET"\n)',
+      'ConfigModule.schema(\n  SchemaModule.String,\n  "MODULE_PRIVATE_KEY"\n)',
+      'Config.schema(\n  SchemaString,\n  "IMPORTED_ACCESS_KEY"\n)',
     ]);
     const suppressionFindings = report.findings.filter(
       (finding) => finding.ruleId === "effect-doctor/diagnostic-suppression"

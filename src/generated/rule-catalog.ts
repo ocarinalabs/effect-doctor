@@ -235,10 +235,33 @@ export const GENERATED_RULE_CATALOG = [
     "title": "No Run Sync On Suspending Effect"
   },
   {
+    "category": "correctness",
+    "defaultEnabled": true,
+    "defaultSeverity": "advice",
+    "description": "Keep escaping exceptions out of confirmed Effect generator bodies.",
+    "diagnosticCodes": [],
+    "diagnosticRuleIds": [
+      "effect-doctor(no-throw-in-effect-generator)"
+    ],
+    "execution": "oxlint",
+    "fixable": false,
+    "id": "effect-doctor/no-throw-in-effect-generator",
+    "nativeRuleId": "no-throw-in-effect-generator",
+    "providerDefaultSeverity": "warning",
+    "providerRuleId": "effect-doctor/no-throw-in-effect-generator",
+    "selection": "advise",
+    "source": "effect-doctor",
+    "status": "advisory",
+    "supportedEffectVersions": [
+      "v4"
+    ],
+    "title": "No Throw In Effect Generator"
+  },
+  {
     "category": "security",
     "defaultEnabled": true,
     "defaultSeverity": "advice",
-    "description": "Prevent Redacted.value from exposing secrets directly inside logs and errors.",
+    "description": "Prevent Redacted.value from exposing secrets directly inside diagnostic and telemetry sinks.",
     "diagnosticCodes": [],
     "diagnosticRuleIds": [
       "effect-doctor(no-unredacted-value-in-diagnostic)"
@@ -284,7 +307,7 @@ export const GENERATED_RULE_CATALOG = [
     "category": "security",
     "defaultEnabled": true,
     "defaultSeverity": "advice",
-    "description": "Prefer Config.redacted for statically named secret configuration values.",
+    "description": "Redact statically named secret configuration values at construction.",
     "diagnosticCodes": [],
     "diagnosticRuleIds": [
       "effect-doctor(prefer-config-redacted)"

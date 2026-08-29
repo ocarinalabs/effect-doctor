@@ -1,5 +1,8 @@
 import { Effect, Redacted } from "effect";
-import { logError as reportEffectError } from "effect/Effect";
+import {
+  annotateCurrentSpan as annotateSpan,
+  logError as reportEffectError,
+} from "effect/Effect";
 import { value as revealSecret } from "effect/Redacted";
 import * as RedactedModule from "effect/Redacted";
 import { value as unwrapNewtype } from "effect/Newtype";
@@ -23,7 +26,28 @@ export const errorLeak = new Error(
   ["request failed", revealSecret(secret)].join(": ")
 );
 
+export const logAnnotationLeak = Effect.annotateLogs(Effect.void, {
+  token: Redacted.value(secret),
+});
+
+export const scopedLogAnnotationLeak = Effect.annotateLogsScoped({
+  token: RedactedModule.value(secret),
+});
+
+export const spanAnnotationLeak = Effect.annotateSpans(
+  Effect.void,
+  "token",
+  revealSecret(secret)
+);
+
+export const currentSpanAnnotationLeak = annotateSpan({
+  token: revealSecret(secret),
+});
+
 export const wrappedEffectLog = Effect.logInfo("api token", secret);
+export const wrappedAnnotation = Effect.annotateLogs(Effect.void, {
+  token: secret,
+});
 
 export const bareReveal = Redacted.value(secret);
 

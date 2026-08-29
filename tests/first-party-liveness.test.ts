@@ -20,6 +20,7 @@ const EXPECTED_FIRST_PARTY_RULES = [
   "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
   "effect-doctor/no-network-in-sql-transaction",
   "effect-doctor/no-run-sync-on-suspending-effect",
+  "effect-doctor/no-throw-in-effect-generator",
   "effect-doctor/no-unredacted-value-in-diagnostic",
   "effect-doctor/prefer-abort-signal-passthrough",
   "effect-doctor/prefer-config-redacted",
@@ -133,6 +134,10 @@ describe("first-party rule liveness", () => {
       "RedactedModule.value(secret)",
       "revealSecret(secret)",
       "revealSecret(secret)",
+      "Redacted.value(secret)",
+      "RedactedModule.value(secret)",
+      "revealSecret(secret)",
+      "revealSecret(secret)",
     ]);
   });
 
@@ -145,6 +150,21 @@ describe("first-party rule liveness", () => {
       'runSyncExit(sleep("1 millis"))',
       "Effect.runSync(\n  tryPromise(() => Promise.resolve(2))\n)",
       "runSyncExit(Effect.never)",
+    ]);
+  });
+
+  it("reports throws that escape confirmed Effect generator bodies", async () => {
+    const findings = await findingsFor(
+      "effect-doctor/no-throw-in-effect-generator"
+    );
+    expect(findings.map((finding) => finding.evidence)).toEqual([
+      'throw new Error("invalid user input");',
+      'throw new Error("invalid order input");',
+      'throw new Error("invalid package input");',
+      'throw new Error("invalid named operation input");',
+      'throw new Error("invalid direct operation input");',
+      'throw new Error("invalid untraced operation input");',
+      'throw new Error("invalid eager operation input");',
     ]);
   });
 

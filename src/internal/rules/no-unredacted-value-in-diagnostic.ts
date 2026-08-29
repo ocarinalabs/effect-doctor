@@ -21,7 +21,11 @@ const REDACTED_IMPORT_BINDINGS: ReadonlyMap<string, RedactedImportBinding> =
     ["effect/Redacted:named:value", "value"],
   ]);
 
-const EFFECT_LOG_FUNCTIONS: ReadonlySet<string> = new Set([
+const EFFECT_DIAGNOSTIC_FUNCTIONS: ReadonlySet<string> = new Set([
+  "annotateCurrentSpan",
+  "annotateLogs",
+  "annotateLogsScoped",
+  "annotateSpans",
   "log",
   "logDebug",
   "logError",
@@ -56,13 +60,15 @@ const isRedactedValueCall = (
   );
 };
 
-const isEffectLogCall = (
+const isEffectDiagnosticCall = (
   context: Context,
   bindings: ReadonlyMap<number, EffectImportBinding>,
   call: ESTree.CallExpression
 ): boolean => {
   const exportName = effectExportName(context, bindings, call.callee);
-  return exportName !== undefined && EFFECT_LOG_FUNCTIONS.has(exportName);
+  return (
+    exportName !== undefined && EFFECT_DIAGNOSTIC_FUNCTIONS.has(exportName)
+  );
 };
 
 const isConsoleLogCall = (
@@ -95,13 +101,13 @@ const isGlobalErrorConstructor = (
 };
 
 const MESSAGE =
-  "Keep Redacted values wrapped inside logs and errors; reveal them only at a trusted non-diagnostic boundary.";
+  "Keep Redacted values wrapped inside logs, errors, and telemetry; reveal them only at a trusted non-diagnostic boundary.";
 
 export const noUnredactedValueInDiagnostic = defineRule({
   meta: {
     docs: {
       description:
-        "Prevent Redacted.value from exposing secrets directly inside logs and errors.",
+        "Prevent Redacted.value from exposing secrets directly inside diagnostic and telemetry sinks.",
     },
     type: "problem",
   },
@@ -148,7 +154,7 @@ export const noUnredactedValueInDiagnostic = defineRule({
       "FunctionExpression:exit": exitFunction,
       CallExpression(node) {
         if (
-          isEffectLogCall(context, effectBindings, node) ||
+          isEffectDiagnosticCall(context, effectBindings, node) ||
           isConsoleLogCall(context, node)
         ) {
           diagnosticCalls.add(node);
