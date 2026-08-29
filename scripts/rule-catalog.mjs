@@ -335,6 +335,26 @@ const makeDoctorEntries = () => [
     title: "Diagnostic Suppression",
   },
   {
+    category: "correctness",
+    defaultEnabled: true,
+    defaultSeverity: "advice",
+    description:
+      "Avoid synchronous runners for Effect constructors that are proven to suspend.",
+    diagnosticCodes: [],
+    diagnosticRuleIds: ["effect-doctor(no-run-sync-on-suspending-effect)"],
+    execution: "oxlint",
+    fixable: false,
+    id: "effect-doctor/no-run-sync-on-suspending-effect",
+    nativeRuleId: "no-run-sync-on-suspending-effect",
+    providerDefaultSeverity: "warning",
+    providerRuleId: "effect-doctor/no-run-sync-on-suspending-effect",
+    selection: "advise",
+    source: "effect-doctor",
+    status: "advisory",
+    supportedEffectVersions: ["v4"],
+    title: "No Run Sync On Suspending Effect",
+  },
+  {
     category: "security",
     defaultEnabled: true,
     defaultSeverity: "advice",
@@ -371,7 +391,7 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 2,
+    "effect-doctor": 3,
     "effect-oxlint": 40,
     "effect-tsgo": 99,
   };
@@ -415,7 +435,7 @@ const assertCatalog = (entries) => {
   assertCount(
     "enabled rules",
     entries.filter((entry) => entry.defaultEnabled).length,
-    45
+    46
   );
   const tsgo = entries.filter((entry) => entry.source === "effect-tsgo");
   assertTsgoCodes(tsgo);
