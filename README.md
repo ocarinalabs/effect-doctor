@@ -59,6 +59,8 @@ Reports intentionally contain no timestamps, durations, temporary paths, hostnam
 
 See [the architecture guide](docs/architecture.md) for catalog ownership, snapshot planning, provider receipts, execution modes, and clean-room parity goals.
 
+See [the first-party rule contracts](docs/research/first-party-rules.md) for official provenance, deliberate abstentions, rejected candidates, adversarial fixtures, and pinned-corpus calibration.
+
 ## Development
 
 ```sh
