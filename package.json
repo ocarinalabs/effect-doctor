@@ -46,6 +46,7 @@
   },
   "scripts": {
     "audit": "fallow --fail-on-issues --threads 4",
+    "audit:dependencies": "bun audit --audit-level=high",
     "bench": "bun run build && node scripts/benchmark.mjs",
     "catalog:check": "node scripts/rule-catalog.mjs",
     "catalog:generate": "node scripts/rule-catalog.mjs --write",
@@ -60,7 +61,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:package": "node scripts/verify-package.mjs",
-    "verify:release": "bun run check && bun run audit && bun run doctor:self && bun run verify:package && npm pack --dry-run"
+    "verify:release": "bun run audit:dependencies && bun run check && bun run audit && bun run doctor:self && bun run verify:package && npm pack --dry-run"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-rc.112",

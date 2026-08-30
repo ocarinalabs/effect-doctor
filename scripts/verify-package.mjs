@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -208,10 +209,27 @@ try {
     ".bin",
     process.platform === "win32" ? "effect-doctor.cmd" : "effect-doctor"
   );
+  assert(existsSync(executable), "The installed package has no CLI shim");
+  const cliCommand =
+    process.platform === "win32" ? process.execPath : executable;
+  const cliArguments = (arguments_) =>
+    process.platform === "win32"
+      ? [
+          join(
+            consumerDirectory,
+            "node_modules",
+            "@ocarinalabs",
+            "effect-doctor",
+            "dist",
+            "bin.js"
+          ),
+          ...arguments_,
+        ]
+      : arguments_;
   const projectsBefore = treeDigest(projectsDirectory);
   const version = run({
-    arguments: ["--version"],
-    command: executable,
+    arguments: cliArguments(["--version"]),
+    command: cliCommand,
     cwd: consumerDirectory,
     expectedExit: 0,
     label: "version",
@@ -223,8 +241,12 @@ try {
 
   const scan = JSON.parse(
     run({
-      arguments: [join(projectsDirectory, "clean"), "--format", "json"],
-      command: executable,
+      arguments: cliArguments([
+        join(projectsDirectory, "clean"),
+        "--format",
+        "json",
+      ]),
+      command: cliCommand,
       cwd: consumerDirectory,
       expectedExit: 0,
       label: "scan-clean",
@@ -240,14 +262,14 @@ try {
 
   const comparison = JSON.parse(
     run({
-      arguments: [
+      arguments: cliArguments([
         "compare",
         join(projectsDirectory, "clean"),
         join(projectsDirectory, "invalid"),
         "--format",
         "json",
-      ],
-      command: executable,
+      ]),
+      command: cliCommand,
       cwd: consumerDirectory,
       expectedExit: 1,
       label: "compare-clean-invalid",
@@ -266,8 +288,8 @@ try {
   );
 
   const rules = run({
-    arguments: ["rules", "list"],
-    command: executable,
+    arguments: cliArguments(["rules", "list"]),
+    command: cliCommand,
     cwd: consumerDirectory,
     expectedExit: 0,
     label: "rules-list",
