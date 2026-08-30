@@ -271,7 +271,10 @@ try {
     })
   );
   for (const exportName of [
+    "AnalyzerFailure",
     "ComparisonReportSchema",
+    "InvalidAnalyzerOutput",
+    "ProjectFailure",
     "ScanReportSchema",
     "compareProjects",
     "knownRules",
