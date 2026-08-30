@@ -16,6 +16,8 @@ Run `bun run verify:package`. Inspect `actions/rules-list/stdout.txt`. The curre
 
 Run `effect-doctor rules explain effect-doctor/prefer-config-redacted` to inspect a stable first-party identity.
 
+Inspect `actions/rules-unknown/stderr.txt` to prove that an unknown identity exits with code `2` instead of silently falling back.
+
 ## Gotchas
 
 The list output is for terminal and shell use. It is tab-separated, not a versioned JSON report.

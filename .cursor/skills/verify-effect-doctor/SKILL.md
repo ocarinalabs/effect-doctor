@@ -41,9 +41,11 @@ bun run verify:package
 The script packs the current checkout, installs the tarball with lifecycle scripts disabled, and drives these user paths:
 
 - scan a clean Effect project;
+- reject an invalid project configuration with the versioned error envelope;
 - compare a clean baseline with an invalid candidate;
-- list the packaged rule catalog; and
-- import the public Node library by package name.
+- list the packaged rule catalog and reject an unknown rule;
+- typecheck and import the public Node library by package name; and
+- prove that the package declares every runtime dependency it uses.
 
 Read [the feature map](features/README.md) before a narrower verification run.
 
@@ -52,6 +54,15 @@ Read [the feature map](features/README.md) before a narrower verification run.
 The command prints an evidence directory under `.verification/effect-doctor/`. Preserve that directory when reporting a result. A valid proof contains `verification.json` with `status` set to `passed`, plus stdout, stderr, command, and exit-status files for every action.
 
 The proof must exercise the installed tarball. It must also show that all three analyzers completed and that the target projects kept the same content digest.
+
+To retain the exact verified archive for a release, pass an empty output directory:
+
+```sh
+release_directory="$(mktemp -d)"
+node scripts/verify-package.mjs --release-directory "$release_directory"
+```
+
+The directory receives `package.tgz`, `SHA256SUMS`, `release.json`, and `verification.json`. Publish `package.tgz` directly; do not repack the checkout.
 
 ## Cleanup
 

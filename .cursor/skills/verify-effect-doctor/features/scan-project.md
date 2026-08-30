@@ -16,7 +16,7 @@ Install the package, then run `effect-doctor .` from an Effect TypeScript projec
 
 Run `bun run verify:package`. Inspect `actions/scan-clean/stdout.txt` in the printed evidence directory. The report must use `effect-doctor/scan/v1`, contain no findings for the clean fixture, and mark all three analyzers complete.
 
-For an operational failure, run the packaged CLI against `tests/fixtures/invalid-config`. Require exit code `2` and the `effect-doctor/error/v1` envelope.
+For an operational failure, inspect `actions/scan-invalid-config/stdout.txt`. It must record exit code `2`, the `effect-doctor/error/v1` envelope, and a `ProjectFailure` tag.
 
 ## Gotchas
 

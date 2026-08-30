@@ -19,6 +19,16 @@ import { DOCTOR_VERSION } from "../src/version.js";
 const projectRoot = realpathSync(
   dirname(fileURLToPath(new URL("../package.json", import.meta.url)))
 );
+const npmCli = join(
+  dirname(process.execPath),
+  "node_modules",
+  "npm",
+  "bin",
+  "npm-cli.js"
+);
+const npmCommand = process.platform === "win32" ? process.execPath : "npm";
+const npmArguments = (arguments_: readonly string[]): readonly string[] =>
+  process.platform === "win32" ? [npmCli, ...arguments_] : arguments_;
 const fixture = realpathSync(
   fileURLToPath(new URL("fixtures/clean", import.meta.url))
 );
@@ -61,7 +71,7 @@ const withPackedCli = <A>(
     mkdtempSync(join(tmpdir(), "effect-doctor-package-"))
   );
   const workspaceRoot = realpathSync(dirname(workspace));
-  if (!workspace.startsWith(`${workspaceRoot}/effect-doctor-package-`)) {
+  if (!workspace.startsWith(join(workspaceRoot, "effect-doctor-package-"))) {
     throw new Error(`Unexpected package-test workspace: ${workspace}`);
   }
 
@@ -71,8 +81,8 @@ const withPackedCli = <A>(
     const packDirectory = join(workspace, "tarball");
     mkdirSync(packDirectory);
     const packed = spawnSync(
-      "npm",
-      ["pack", "--json", "--pack-destination", packDirectory],
+      npmCommand,
+      npmArguments(["pack", "--json", "--pack-destination", packDirectory]),
       {
         cwd: projectRoot,
         encoding: "utf-8",
