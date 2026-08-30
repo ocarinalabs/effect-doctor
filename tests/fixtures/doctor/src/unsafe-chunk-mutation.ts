@@ -27,6 +27,10 @@ export const wrappedAfterMutation = Chunk.fromArrayUnsafe(
   mutatedBeforeWrapping
 );
 
+const deferredWrap = [2, 1];
+export const wrapLater = () => Chunk.fromArrayUnsafe(deferredWrap);
+deferredWrap.sort((left, right) => left - right);
+
 const aliased = [1, 2, 3];
 const alias = aliased;
 export const aliasedChunk = Chunk.fromArrayUnsafe(aliased);

@@ -29,6 +29,12 @@ export const throwsInDirectFn = Fx.fn(function* () {
   throw new Error("invalid direct operation input");
 });
 
+export const throwsInWrappedGen = Fx.gen(
+  (function* () {
+    throw new Error("invalid wrapped generator input");
+  }) satisfies () => Generator<never, never, never>
+);
+
 export const throwsInUntracedFn = untraced(function* () {
   throw new Error("invalid untraced operation input");
 });

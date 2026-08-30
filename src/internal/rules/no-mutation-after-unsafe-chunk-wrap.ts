@@ -4,6 +4,7 @@ import type { Context, ESTree, Variable } from "@oxlint/plugins";
 import {
   collectImportBindings,
   importedExportName,
+  isFunctionBoundary,
   unwrapExpression,
   variableForReference,
 } from "./ast.ts";
@@ -115,16 +116,50 @@ const updatedMemberVariable = (
     ? directMemberVariable(context, target)
     : undefined;
 
+type WrapsByBoundary = ReadonlyMap<Variable, ReadonlyMap<number, number>>;
+
+const executionBoundaryStart = (node: ESTree.Node): number | undefined => {
+  let ancestor: ESTree.Node | null = node.parent;
+  while (ancestor !== null) {
+    if (isFunctionBoundary(ancestor) || ancestor.type === "Program") {
+      return ancestor.range[0];
+    }
+    ancestor = ancestor.parent;
+  }
+  return undefined;
+};
+
 const wasWrappedEarlier = (
-  wraps: ReadonlyMap<Variable, number>,
+  wraps: WrapsByBoundary,
   variable: Variable | undefined,
-  mutationStart: number
+  mutation: ESTree.Node
 ): boolean => {
-  if (variable === undefined) {
+  const boundary = executionBoundaryStart(mutation);
+  if (variable === undefined || boundary === undefined) {
     return false;
   }
-  const wrapEnd = wraps.get(variable);
-  return wrapEnd !== undefined && wrapEnd < mutationStart;
+  const wrapEnd = wraps.get(variable)?.get(boundary);
+  return wrapEnd !== undefined && wrapEnd < mutation.range[0];
+};
+
+const recordWrap = (
+  wraps: Map<Variable, Map<number, number>>,
+  variable: Variable,
+  node: ESTree.CallExpression
+): void => {
+  const boundary = executionBoundaryStart(node);
+  if (boundary === undefined) {
+    return;
+  }
+  const boundaries = wraps.get(variable) ?? new Map<number, number>();
+  const priorWrapEnd = boundaries.get(boundary);
+  boundaries.set(
+    boundary,
+    priorWrapEnd === undefined
+      ? node.range[1]
+      : Math.min(priorWrapEnd, node.range[1])
+  );
+  wraps.set(variable, boundaries);
 };
 
 export const noMutationAfterUnsafeChunkWrap = defineRule({
@@ -137,7 +172,7 @@ export const noMutationAfterUnsafeChunkWrap = defineRule({
   },
   createOnce(context) {
     let bindings: ReadonlyMap<number, ChunkImportBinding> = new Map();
-    const wraps = new Map<Variable, number>();
+    const wraps = new Map<Variable, Map<number, number>>();
 
     const reportIfWrapped = (
       node:
@@ -146,13 +181,14 @@ export const noMutationAfterUnsafeChunkWrap = defineRule({
         | ESTree.UpdateExpression,
       variable: Variable | undefined
     ): void => {
-      if (wasWrappedEarlier(wraps, variable, node.range[0])) {
+      if (wasWrappedEarlier(wraps, variable, node)) {
         context.report({ message: mutationMessage, node });
       }
     };
 
     return {
       before() {
+        wraps.clear();
         bindings = collectImportBindings(
           context.sourceCode.ast,
           CHUNK_IMPORT_BINDINGS
@@ -161,13 +197,7 @@ export const noMutationAfterUnsafeChunkWrap = defineRule({
       CallExpression(node) {
         const wrapped = unsafeWrappedVariable(context, bindings, node);
         if (wrapped !== undefined) {
-          const priorWrapEnd = wraps.get(wrapped);
-          wraps.set(
-            wrapped,
-            priorWrapEnd === undefined
-              ? node.range[1]
-              : Math.min(priorWrapEnd, node.range[1])
-          );
+          recordWrap(wraps, wrapped, node);
           return;
         }
         reportIfWrapped(node, mutatingMethodVariable(context, node));
