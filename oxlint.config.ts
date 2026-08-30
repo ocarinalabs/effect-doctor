@@ -6,8 +6,10 @@ export default defineConfig({
   extends: [core],
   ignorePatterns: [
     ...(core.ignorePatterns ?? []),
+    "docs/research/**",
     "dist/**",
     "tests/fixtures/**",
+    "vendor/**",
   ],
   jsPlugins: ["oxlint-plugin-effect/plugin"],
   overrides: [
@@ -16,6 +18,11 @@ export default defineConfig({
       rules: {
         ...effectRecommended,
         "effect/noConditionalEmptyObjectSpread": "off",
+        "effect/noNewError": "off",
+        "effect/noNullish": "off",
+        "effect/noTernary": "off",
+        "effect/noThrowStatement": "off",
+        "effect/noTryCatch": "off",
       },
     },
     {
@@ -53,6 +60,11 @@ export default defineConfig({
     },
   ],
   rules: {
+    "effect/noNewError": "off",
+    "effect/noNullish": "off",
+    "effect/noTernary": "off",
+    "effect/noThrowStatement": "off",
+    "effect/noTryCatch": "off",
     "func-names": "off",
     "import/extensions": "off",
     "max-classes-per-file": ["error", 12],

@@ -1,12 +1,12 @@
 # Effect Doctor
 
-Effect Doctor is a deterministic quality analyzer for [Effect](https://effect.website/) TypeScript. It gives humans, CI, and coding-agent evaluations one black-box interface over three independent engines:
+Effect Doctor is a deterministic quality analyzer for [Effect](https://effect.website/) TypeScript. It gives humans, CI, and coding-agent evaluations one black-box interface over three independently identified diagnostic sources:
 
 - **Effect TSGo** for official, type-aware Effect diagnostics.
 - **Effect Oxlint** for a curated set of high-confidence structural rules.
-- **Effect Doctor** for first-party integrity rules, beginning with diagnostic-suppression inventory.
+- **Effect Doctor** for host-neutral first-party integrity and security rules executed by Oxlint.
 
-The output is a versioned report with stable ordering, project-relative paths, rule provenance, source evidence, and an explicit file inventory for every engine. If any required analyzer cannot prove complete coverage, the scan fails instead of reporting a false clean result.
+The output is a versioned report with stable ordering, project-relative paths, rule provenance, source evidence, and an explicit file inventory for every provider receipt. If any required analyzer cannot prove complete coverage, the scan fails instead of reporting a false clean result.
 
 ## Usage
 
@@ -14,7 +14,7 @@ The output is a versioned report with stable ordering, project-relative paths, r
 effect-doctor .
 effect-doctor . --format json
 effect-doctor compare ../baseline . --format json
-effect-doctor rules
+effect-doctor rules list
 effect-doctor rules explain effect/floating-effect
 ```
 
@@ -34,15 +34,20 @@ Use `--blocking error`, `--blocking warning`, or `--blocking never` to select th
 
 Effect Doctor does not enable the entire community lint preset. Blanket bans on `async`, nullish values, ternaries, globals, Node adapters, or `try/catch` are team conventions, not universal evidence that Effect code is wrong.
 
-The default Oxlint profile is deliberately narrower:
+The checked-in catalog contains all 155 known rules: 99 Effect TSGo rules, all 40 `oxlint-plugin-effect` rules, and 16 first-party Effect Doctor rules. It is also the only source used to build provider configuration, normalize findings, and implement `rules list` and `rules explain`. Of those rules, 59 are enabled by default: the 28 upstream TSGo defaults, 15 curated Oxlint rules, and all 16 first-party rules.
 
-- runtime construction inside an Effect;
+The default Oxlint profile is deliberately narrower. Seven strong safety checks block at error severity:
+
+- chained type assertions;
+- managed-runtime construction inside an Effect;
 - per-call cache construction;
 - collecting a clearly unbounded stream;
-- silently swallowing failures;
-- unbounded concurrency;
-- unbounded retry; and
-- non-exhaustive tagged matching.
+- unbounded concurrency or retry; and
+- widening followed by an assertion.
+
+Eight broadly useful conventions remain non-blocking advice: module-mock avoidance, object-parameter review, sequential `Effect.all` review, tagged-error helpers, exhaustive tagged matching, tagged predicates, `ServiceMap.Service` construction, and named Effect functions. Preview, TSGo-delegated, and policy-only Oxlint rules remain visible but disabled.
+
+First-party advice inventories diagnostic suppressions and covers narrowly provable configuration, runtime, Effect-generator failure, logging, telemetry, HTTP, SQL, Layer identity/lifetime, callback, Chunk aliasing, Schema compilation, tracing-name, and redaction mistakes. A hidden primary-pass file canary is never reported; it proves that Oxlint executed the JavaScript plugin exactly once over every planned source file. Suppression integrity uses a separate directive-immune Oxlint pass so a disable directive cannot hide itself.
 
 Provider rule names are preserved in `provenance`; Effect Doctor also maps them to stable public rule IDs. First-party rules require adversarial valid and invalid fixtures before they can become blocking diagnostics.
 
@@ -50,16 +55,26 @@ Provider rule names are preserved in `provenance`; Effect Doctor also maps them 
 
 JSON scans use `effect-doctor/scan/v1`; comparisons use `effect-doctor/comparison/v1`. Runtime schemas for both reports are exported from `@ocarinalabs/effect-doctor`.
 
-Reports intentionally contain no timestamps, durations, temporary paths, hostnames, scores, or network-derived data. Effect Doctor never edits the target project and verifies that the planned source inventory remains unchanged during analysis.
+Reports intentionally contain no timestamps, durations, temporary paths, hostnames, scores, raw compiler output, or network-derived data. Effect Doctor never edits the target project and verifies that its expanded configuration, exact source inventory, and source contents remain unchanged during analysis.
+
+See [the architecture guide](docs/architecture.md) for catalog ownership, snapshot planning, provider receipts, execution modes, and clean-room parity goals.
+
+See [the first-party rule contracts](docs/research/first-party-rules.md) for official provenance, deliberate abstentions, rejected candidates, adversarial fixtures, and pinned-corpus calibration.
+
+See [the Kit Effect skill audit](docs/research/kit-effect-skill-audit.md) for the recommendation-by-recommendation ownership and enforceability decisions.
+
+See [the additional guidance audit](docs/research/ecosystem/additional-guidance-rule-audit.md) for the complete Effect Solutions, Joel Hooks, Biome, and Betalyra PR inventory and the admitted, delegated, rejected, and research-only dispositions.
 
 ## Development
 
 ```sh
 bun install
 bun run setup:effect
+bun run catalog:check
 bun run check
 bun run audit
 bun run doctor:self
+bun run bench
 npm pack --dry-run
 ```
 

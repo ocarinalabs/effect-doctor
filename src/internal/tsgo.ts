@@ -1,3 +1,5 @@
+import { dirname } from "node:path";
+
 import { FileSystem, Path, Effect } from "effect";
 
 import {
@@ -7,49 +9,25 @@ import {
 } from "../errors.js";
 import { fingerprintFinding } from "../fingerprint.js";
 import type {
-  EngineRun,
   Finding,
   FindingWithoutFingerprint,
+  ProviderReceipt,
 } from "../model.js";
-import {
-  canonicalRuleId,
-  ruleTitle,
-  tsgoCategory,
-  tsgoSeverity,
-} from "../rules.js";
-import { TOOLCHAIN } from "../version.js";
+import { ruleForTsgoDiagnostic, tsgoDiagnosticSeverity } from "../rules.js";
+import { compareCodeUnits } from "./order.js";
 import { runProcess } from "./process.js";
+import type { ProjectSnapshot } from "./project-snapshot.js";
 import type { ToolchainPaths } from "./toolchain.js";
 import { decodeTsgoOutput } from "./tsgo-output.js";
 import type { TsgoDiagnostic, TsgoOutput } from "./tsgo-output.js";
 
 const LSP_CONFIG = {
-  diagnosticSeverity: {
-    asyncFunction: "off",
-    cryptoRandomUUID: "off",
-    cryptoRandomUUIDInEffect: "off",
-    globalConsole: "off",
-    globalConsoleInEffect: "off",
-    globalDate: "off",
-    globalDateInEffect: "off",
-    globalFetch: "off",
-    globalFetchInEffect: "off",
-    globalRandom: "off",
-    globalRandomInEffect: "off",
-    globalTimers: "off",
-    globalTimersInEffect: "off",
-    newPromise: "off",
-    nodeBuiltinImport: "off",
-    preferSchemaOverJson: "off",
-    processEnv: "off",
-    processEnvInEffect: "off",
-    tryCatchInEffectGen: "off",
-  },
+  diagnosticSeverity: tsgoDiagnosticSeverity,
   diagnostics: true,
   noExternal: true,
 };
 
-export type TsgoAnalysis = {
+type TsgoAnalysis = {
   readonly output: TsgoOutput;
   readonly files: readonly string[];
 };
@@ -58,21 +36,21 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
   toolchain: ToolchainPaths,
   tsconfig: string
 ) {
+  const cwd = dirname(tsconfig);
+  const request = {
+    cwd,
+    format: "json",
+    listFiles: true,
+    lspconfig: JSON.stringify(LSP_CONFIG),
+    progress: false,
+    project: tsconfig,
+    strict: false,
+  };
   const result = yield* runProcess({
-    arguments: [
-      toolchain.tsgoCli,
-      "diagnostics",
-      "--project",
-      tsconfig,
-      "--format",
-      "json",
-      "--list-files",
-      "--lspconfig",
-      JSON.stringify(LSP_CONFIG),
-    ],
-    cwd: toolchain.packageRoot,
+    arguments: ["--effect-cli-diagnostics", JSON.stringify(request)],
+    cwd,
     engine: "effect-tsgo",
-    executable: process.execPath,
+    executable: toolchain.tsgoExecutable,
   });
 
   if (result.exitCode !== 0 && result.exitCode !== 1) {
@@ -80,15 +58,15 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
       engine: "effect-tsgo",
       exitCode: result.exitCode,
       message: `Effect TSGo exited with code ${result.exitCode}`,
-      stderr: result.stderr,
+      stderr: "",
     });
   }
 
   const output = yield* Effect.try({
-    catch: (cause) =>
+    catch: () =>
       new InvalidAnalyzerOutput({
         engine: "effect-tsgo",
-        message: `Invalid Effect TSGo output: ${String(cause)}`,
+        message: "Effect TSGo returned invalid analysis output.",
       }),
     try: () => decodeTsgoOutput(result.stdout),
   });
@@ -100,49 +78,43 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
 });
 
 export const validateTsgoFiles = Effect.fn("validateTsgoFiles")(function* (
-  root: string,
-  analysis: TsgoAnalysis
+  snapshot: ProjectSnapshot,
+  analysis: TsgoAnalysis,
+  version: string
 ) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const files: {
-    readonly absolute: string;
-    readonly relative: string;
-    readonly source: string;
-  }[] = [];
+  const reportedFiles: string[] = [];
 
   for (const file of analysis.files) {
     const absolute = yield* fs.realPath(file).pipe(
       Effect.mapError(
         () =>
           new ProjectFailure({
-            message: `Effect TSGo reported a file that cannot be resolved: ${file}`,
-            root,
+            message: "Effect TSGo reported an unresolved project file.",
+            root: snapshot.root,
           })
       )
     );
-    const relative = path.relative(root, absolute).replaceAll("\\", "/");
+    const relative = path
+      .relative(snapshot.root, absolute)
+      .replaceAll("\\", "/");
     if (relative.startsWith("../") || path.isAbsolute(relative)) {
       return yield* new ProjectFailure({
-        message: `Effect TSGo reported a file outside the project root: ${file}`,
-        root,
+        message: "Effect TSGo reported a file outside the project root.",
+        root: snapshot.root,
       });
     }
-    const source = yield* fs.readFileString(absolute).pipe(
-      Effect.mapError(
-        () =>
-          new ProjectFailure({
-            message: `Unable to read analyzed source file: ${file}`,
-            root,
-          })
-      )
-    );
-    files.push({ absolute, relative, source });
+    reportedFiles.push(relative);
   }
 
-  return files.sort((left, right) =>
-    left.relative.localeCompare(right.relative)
-  );
+  reportedFiles.sort(compareCodeUnits);
+  return {
+    analyzedFiles: reportedFiles,
+    complete: true,
+    engine: "effect-tsgo",
+    version,
+  } satisfies ProviderReceipt;
 });
 
 export type AnalyzedSource = {
@@ -157,27 +129,62 @@ const sourceForDiagnostic = (
 ): AnalyzedSource | undefined =>
   sources.find((source) => source.absolute === diagnostic.file);
 
-const DOCTOR_OWNED_DIAGNOSTICS = new Set(["effect(377000)"]);
-
-export const normalizeTsgoFindings = (
-  analysis: TsgoAnalysis,
-  sources: readonly AnalyzedSource[]
-): readonly Finding[] =>
-  analysis.output.diagnostics
-    .filter((diagnostic) => !DOCTOR_OWNED_DIAGNOSTICS.has(diagnostic.name))
-    .map((diagnostic) => {
+export const normalizeTsgoFindings = Effect.fn("normalizeTsgoFindings")(
+  function* (analysis: TsgoAnalysis, sources: readonly AnalyzedSource[]) {
+    const findings: Finding[] = [];
+    for (const diagnostic of analysis.output.diagnostics) {
+      const rule = ruleForTsgoDiagnostic(diagnostic.name, diagnostic.code);
+      if (rule?.source === "effect-doctor") {
+        continue;
+      }
+      if (rule === undefined || rule.source !== "effect-tsgo") {
+        return yield* new InvalidAnalyzerOutput({
+          engine: "effect-tsgo",
+          message: `Effect TSGo emitted unknown diagnostic: ${diagnostic.name}`,
+        });
+      }
+      const configuredSeverity = tsgoDiagnosticSeverity[rule.providerRuleId];
+      if (
+        !rule.defaultEnabled ||
+        configuredSeverity === undefined ||
+        configuredSeverity === "off" ||
+        configuredSeverity !== diagnostic.severity
+      ) {
+        return yield* new InvalidAnalyzerOutput({
+          engine: "effect-tsgo",
+          message: `Effect TSGo diagnostic disagrees with catalog policy: ${diagnostic.name}`,
+        });
+      }
+      const fileVersion = analysis.output.files.find(
+        (file) => file.file === diagnostic.file
+      );
+      if (
+        fileVersion === undefined ||
+        !rule.supportedEffectVersions.includes(fileVersion.supportedEffect)
+      ) {
+        return yield* new InvalidAnalyzerOutput({
+          engine: "effect-tsgo",
+          message: `Effect TSGo diagnostic is unsupported for the detected Effect version: ${diagnostic.name}`,
+        });
+      }
       const source = sourceForDiagnostic(diagnostic, sources);
-      const evidence =
-        source?.source.slice(
-          diagnostic.start,
-          diagnostic.start + diagnostic.length
-        ) ?? "";
+      if (source === undefined) {
+        return yield* new InvalidAnalyzerOutput({
+          engine: "effect-tsgo",
+          message:
+            "Effect TSGo diagnostic source is outside the project snapshot.",
+        });
+      }
+      const evidence = source.source.slice(
+        diagnostic.start,
+        diagnostic.start + diagnostic.length
+      );
       const withoutFingerprint = {
-        category: tsgoCategory(diagnostic.name),
+        category: rule.category,
         evidence,
         location: {
           end: { column: diagnostic.endColumn, line: diagnostic.endLine },
-          file: source?.relative ?? diagnostic.file,
+          file: source.relative,
           start: { column: diagnostic.column, line: diagnostic.line },
         },
         message: diagnostic.message,
@@ -185,22 +192,16 @@ export const normalizeTsgoFindings = (
           engine: "effect-tsgo",
           nativeRuleId: diagnostic.name,
         },
-        ruleId: canonicalRuleId(diagnostic.name),
-        severity: tsgoSeverity(diagnostic.name, diagnostic.severity),
-        title: ruleTitle(diagnostic.name),
+        ruleId: rule.id,
+        severity: rule.defaultSeverity,
+        title: rule.title,
       } satisfies FindingWithoutFingerprint;
 
-      return {
+      findings.push({
         ...withoutFingerprint,
         fingerprint: fingerprintFinding(withoutFingerprint),
-      };
-    });
-
-export const tsgoEngineRun = (
-  sources: readonly AnalyzedSource[]
-): EngineRun => ({
-  analyzedFiles: sources.map((source) => source.relative),
-  complete: true,
-  engine: "effect-tsgo",
-  version: TOOLCHAIN.tsgo,
-});
+      });
+    }
+    return findings;
+  }
+);

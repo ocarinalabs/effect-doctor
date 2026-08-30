@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { decodeTsgoOutput } from "../src/internal/tsgo-output.js";
@@ -6,7 +7,7 @@ import { normalizeTsgoFindings } from "../src/internal/tsgo.js";
 const validOutput = {
   diagnostics: [
     {
-      code: 1,
+      code: 377_001,
       column: 3,
       endColumn: 9,
       endLine: 2,
@@ -96,7 +97,91 @@ describe("decodeTsgoOutput", () => {
 });
 
 describe("normalizeTsgoFindings", () => {
-  it("leaves directive inventory to Effect Doctor's comment-aware rule", () => {
+  it("rejects a diagnostic code that belongs to a different rule name", async () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    diagnostic.code = 377_046;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    await expect(
+      Effect.runPromise(
+        normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+          {
+            absolute: "/workspace/src/main.ts",
+            relative: "src/main.ts",
+            source: "Effect.void",
+          },
+        ])
+      )
+    ).rejects.toMatchObject({
+      _tag: "InvalidAnalyzerOutput",
+      engine: "effect-tsgo",
+    });
+  });
+
+  it("rejects emitted severity that disagrees with enabled policy", async () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    diagnostic.severity = "warning";
+    wire.summary.errors = 0;
+    wire.summary.warnings = 1;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    await expect(
+      Effect.runPromise(
+        normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+          {
+            absolute: "/workspace/src/main.ts",
+            relative: "src/main.ts",
+            source: "Effect.void",
+          },
+        ])
+      )
+    ).rejects.toMatchObject({
+      _tag: "InvalidAnalyzerOutput",
+      engine: "effect-tsgo",
+    });
+  });
+
+  it("rejects a diagnostic for a cataloged but disabled rule", async () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    diagnostic.code = 377_111;
+    diagnostic.name = "abortControllerInEffect";
+    diagnostic.severity = "message";
+    wire.summary.errors = 0;
+    wire.summary.messages = 1;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    await expect(
+      Effect.runPromise(
+        normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+          {
+            absolute: "/workspace/src/main.ts",
+            relative: "src/main.ts",
+            source: "Effect.void",
+          },
+        ])
+      )
+    ).rejects.toMatchObject({
+      _tag: "InvalidAnalyzerOutput",
+      engine: "effect-tsgo",
+    });
+  });
+
+  it("leaves directive inventory to Effect Doctor's comment-aware rule", async () => {
     const wire = structuredClone(validOutput);
     const diagnostic = wire.diagnostics.at(0);
     expect(diagnostic).toBeDefined();
@@ -117,13 +202,41 @@ describe("normalizeTsgoFindings", () => {
     const output = decodeTsgoOutput(JSON.stringify(wire));
 
     expect(
-      normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
-        {
-          absolute: "/workspace/src/main.ts",
-          relative: "src/main.ts",
-          source: 'const example = "@effect-diagnostics"',
-        },
-      ])
+      await Effect.runPromise(
+        normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+          {
+            absolute: "/workspace/src/main.ts",
+            relative: "src/main.ts",
+            source: 'const example = "@effect-diagnostics"',
+          },
+        ])
+      )
     ).toEqual([]);
+  });
+
+  it("rejects diagnostics absent from the pinned catalog", async () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    diagnostic.name = "futureUnknownDiagnostic";
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    await expect(
+      Effect.runPromise(
+        normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+          {
+            absolute: "/workspace/src/main.ts",
+            relative: "src/main.ts",
+            source: "Effect.void",
+          },
+        ])
+      )
+    ).rejects.toMatchObject({
+      _tag: "InvalidAnalyzerOutput",
+      engine: "effect-tsgo",
+    });
   });
 });

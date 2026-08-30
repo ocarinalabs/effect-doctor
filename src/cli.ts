@@ -22,15 +22,26 @@ const blockingFlag = Flag.choice("blocking", [
   Flag.withDefault("error")
 );
 
+const failureMessage = (failure: DoctorFailure): string => {
+  if (failure._tag === "ProjectFailure") {
+    return "Project configuration could not be analyzed.";
+  }
+  if (failure._tag === "AnalyzerFailure") {
+    return `${failure.engine} could not complete analysis.`;
+  }
+  return `${failure.engine} returned invalid analysis output.`;
+};
+
 const renderFailure = (
   failure: DoctorFailure,
   format: "pretty" | "json"
 ): string => {
+  const message = failureMessage(failure);
   if (format === "json") {
     return JSON.stringify(
       {
         error: {
-          message: failure.message,
+          message,
           tag: failure._tag,
         },
         schema: "effect-doctor/error/v1",
@@ -40,7 +51,7 @@ const renderFailure = (
       2
     );
   }
-  return `Effect Doctor failed: ${failure.message}`;
+  return `Effect Doctor failed: ${message}`;
 };
 
 const scan = Command.make(
@@ -132,23 +143,33 @@ const explain = Command.make(
         `Source: ${metadata.source}`,
         `Native rule: ${metadata.nativeRuleId}`,
         `Default severity: ${metadata.defaultSeverity}`,
+        `Enabled: ${metadata.defaultEnabled ? "yes" : "no"}`,
+        `Status: ${metadata.status}`,
+        `Selection: ${metadata.selection}`,
+        `Category: ${metadata.category}`,
+        `Fixable: ${metadata.fixable ? "yes" : "no"}`,
+        `Effect versions: ${metadata.supportedEffectVersions.join(", ") || "unspecified"}`,
+        `Description: ${metadata.description}`,
       ].join("\n")
     );
   })
 ).pipe(Command.withDescription("Explain one canonical rule"));
 
-const rules = Command.make(
-  "rules",
-  {},
-  Effect.fn("effectDoctor.rules")(function* () {
-    const lines = knownRules().map(
-      (rule) => `${rule.id}\t${rule.defaultSeverity}\t${rule.source}`
-    );
-    yield* Console.log(lines.join("\n"));
-  })
-).pipe(
+const listRules = Effect.fn("effectDoctor.rules.list")(function* () {
+  const lines = knownRules().map(
+    (rule) =>
+      `${rule.id}\t${rule.defaultSeverity}\t${rule.defaultEnabled ? "enabled" : "disabled"}\t${rule.status}\t${rule.selection}\t${rule.source}\t${rule.description}`
+  );
+  yield* Console.log(lines.join("\n"));
+});
+
+const list = Command.make("list", {}, listRules).pipe(
+  Command.withDescription("List canonical rules and their policy")
+);
+
+const rules = Command.make("rules", {}, listRules).pipe(
   Command.withDescription("List canonical rules and their providers"),
-  Command.withSubcommands([explain])
+  Command.withSubcommands([list, explain])
 );
 
 export const effectDoctorCommand = scan.pipe(

@@ -1,4 +1,5 @@
 {
   "$schema": "./node_modules/fallow/schema.json",
+  "dynamicallyLoaded": ["src/internal/doctor-plugin.ts"],
   "entry": ["src/index.ts", "oxfmt.config.ts"]
 }

@@ -1,9 +1,14 @@
 import { Effect, Schema, Stream } from "effect";
+import type { Duration } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AnalyzerFailure } from "../errors.js";
 
-const ProcessEngineSchema = Schema.Literals(["effect-tsgo", "effect-oxlint"]);
+const ProcessEngineSchema = Schema.Literals([
+  "effect-tsgo",
+  "effect-oxlint",
+  "effect-doctor",
+]);
 type ProcessEngine = typeof ProcessEngineSchema.Type;
 
 type ProcessRequest = {
@@ -11,6 +16,7 @@ type ProcessRequest = {
   readonly executable: string;
   readonly arguments: readonly string[];
   readonly cwd: string;
+  readonly timeout?: Duration.Input;
 };
 
 export const runProcess = Effect.fn("runProcess")(function* (
@@ -32,6 +38,8 @@ export const runProcess = Effect.fn("runProcess")(function* (
           stderr: "pipe",
           stdin: "ignore",
           stdout: "pipe",
+          forceKillAfter: "1 second",
+          killSignal: "SIGTERM",
         })
       );
 
@@ -49,13 +57,13 @@ export const runProcess = Effect.fn("runProcess")(function* (
   );
 
   return yield* execution.pipe(
-    Effect.timeout("2 minutes"),
+    Effect.timeout(request.timeout ?? "2 minutes"),
     Effect.mapError(
-      (cause) =>
+      () =>
         new AnalyzerFailure({
           engine: request.engine,
           exitCode: null,
-          message: `Unable to run ${request.engine}: ${String(cause)}`,
+          message: `${request.engine} could not be started.`,
           stderr: "",
         })
     )
