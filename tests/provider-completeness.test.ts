@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeOxlintFindings } from "../src/internal/oxlint.js";
 import type { ProjectSnapshot } from "../src/internal/project-snapshot.js";
 import { validateProviderReceipts } from "../src/internal/provider-receipt.js";
+import { DOCTOR_VERSION } from "../src/version.js";
 
 const snapshot = {
   configuration: {
@@ -32,7 +33,7 @@ describe("provider completeness", () => {
             analyzedFiles: [],
             complete: false,
             engine: "effect-doctor",
-            version: "0.0.0",
+            version: DOCTOR_VERSION,
           },
           {
             analyzedFiles: ["src/main.ts"],

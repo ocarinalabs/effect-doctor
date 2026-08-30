@@ -9,6 +9,7 @@ import {
   compareProjects,
   scanProject,
 } from "../src/index.js";
+import { DOCTOR_VERSION } from "../src/version.js";
 
 const fixture = (name: "clean" | "doctor" | "invalid"): string =>
   fileURLToPath(new URL(`fixtures/${name}`, import.meta.url));
@@ -29,7 +30,7 @@ describe("scanProject", () => {
         ],
         complete: true,
         engine: "effect-doctor",
-        version: "0.0.0",
+        version: DOCTOR_VERSION,
       },
       {
         analyzedFiles: [
@@ -68,7 +69,7 @@ describe("scanProject", () => {
         analyzedFiles: ["src/main.ts"],
         complete: true,
         engine: "effect-doctor",
-        version: "0.0.0",
+        version: DOCTOR_VERSION,
       },
       {
         analyzedFiles: ["src/main.ts"],

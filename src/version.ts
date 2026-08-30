@@ -1,4 +1,6 @@
-export const DOCTOR_VERSION = "0.0.0";
+import packageManifest from "../package.json" with { type: "json" };
+
+export const DOCTOR_VERSION = packageManifest.version;
 
 export const PINNED_TOOLCHAIN = Object.freeze({
   effect: "4.0.0-rc.112",

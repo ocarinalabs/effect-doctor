@@ -1,11 +1,21 @@
 {
   "name": "@ocarinalabs/effect-doctor",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Deterministic Effect TypeScript diagnostics for humans and coding-agent evaluations.",
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "lint",
+    "static-analysis",
+    "typescript"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ocarinalabs/effect-doctor.git"
+  },
   "bin": {
-    "effect-doctor": "./dist/bin.js"
+    "effect-doctor": "dist/bin.js"
   },
   "files": [
     "dist",
@@ -20,6 +30,10 @@
       "default": "./dist/index.js"
     },
     "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
     "audit": "fallow --fail-on-issues --threads 4",

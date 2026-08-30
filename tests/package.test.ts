@@ -14,6 +14,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { DOCTOR_VERSION } from "../src/version.js";
+
 const projectRoot = realpathSync(
   dirname(fileURLToPath(new URL("../package.json", import.meta.url)))
 );
@@ -23,7 +25,18 @@ const fixture = realpathSync(
 const packageManifest = JSON.parse(
   readFileSync(join(projectRoot, "package.json"), "utf-8")
 ) as {
+  readonly bin: Readonly<Record<string, string>>;
+  readonly private?: boolean;
+  readonly publishConfig?: {
+    readonly access?: string;
+    readonly registry?: string;
+  };
+  readonly repository?: {
+    readonly type?: string;
+    readonly url?: string;
+  };
   readonly scripts: Readonly<Record<string, string>>;
+  readonly version: string;
 };
 const runPackagedCli = (
   packagedCli: string,
@@ -93,6 +106,23 @@ const withPackedCli = <A>(
 };
 
 describe.sequential("the packed CLI", () => {
+  it("is configured for the initial public release", () => {
+    expect(packageManifest).toMatchObject({
+      bin: { "effect-doctor": "dist/bin.js" },
+      publishConfig: {
+        access: "public",
+        registry: "https://registry.npmjs.org/",
+      },
+      repository: {
+        type: "git",
+        url: "git+https://github.com/ocarinalabs/effect-doctor.git",
+      },
+    });
+    expect(packageManifest.private).toBeUndefined();
+    expect(packageManifest.version).not.toBe("0.0.0");
+    expect(DOCTOR_VERSION).toBe(packageManifest.version);
+  });
+
   it("checks catalog drift in local and package verification", () => {
     expect(packageManifest.scripts.check).toMatch(/^bun run catalog:check/u);
     expect(packageManifest.scripts.prepack).toMatch(/^bun run catalog:check/u);
