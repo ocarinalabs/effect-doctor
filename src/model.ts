@@ -1,5 +1,10 @@
 import { Schema } from "effect";
 
+import { compareFindings } from "./delta.js";
+import { fingerprintFinding } from "./fingerprint.js";
+import { compareFindingOrder } from "./internal/finding-order.js";
+import { compareCodeUnits } from "./internal/order.js";
+
 const PositiveInt = Schema.Int.pipe(
   Schema.check(Schema.isGreaterThanOrEqualTo(1))
 );
@@ -21,9 +26,29 @@ const PositionSchema = Schema.Struct({
   column: PositiveInt,
   line: PositiveInt,
 });
+
+const isProjectRelativePath = (file: string): boolean =>
+  !file.startsWith("/") &&
+  !file.startsWith("\\") &&
+  !/^[A-Za-z]:/u.test(file) &&
+  !file.includes("\\") &&
+  file
+    .split("/")
+    .every((segment) => segment !== "" && segment !== "." && segment !== "..");
+
+const ProjectRelativePathSchema = Schema.NonEmptyString.pipe(
+  Schema.check(
+    Schema.makeFilter((file) =>
+      isProjectRelativePath(file)
+        ? []
+        : ["File paths must be normalized project-relative POSIX paths"]
+    )
+  )
+);
+
 const SourceSpanWire = Schema.Struct({
   end: PositionSchema,
-  file: Schema.NonEmptyString,
+  file: ProjectRelativePathSchema,
   start: PositionSchema,
 });
 const SourceSpanSchema = SourceSpanWire.check(
@@ -58,7 +83,7 @@ export type Finding = typeof FindingSchema.Type;
 export type FindingWithoutFingerprint = Omit<Finding, "fingerprint">;
 
 const ProviderReceiptSchema = Schema.Struct({
-  analyzedFiles: Schema.Array(Schema.NonEmptyString),
+  analyzedFiles: Schema.Array(ProjectRelativePathSchema),
   complete: Schema.Boolean,
   engine: ProvenanceSchema.fields.engine,
   version: Schema.NonEmptyString,
@@ -99,6 +124,18 @@ const sameStrings = (
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
+const isOrdered = <A>(
+  values: readonly A[],
+  compare: (left: A, right: A) => number
+): boolean =>
+  values.every((value, index) => {
+    if (index === 0) {
+      return true;
+    }
+    const previous = values[index - 1];
+    return previous !== undefined && compare(previous, value) <= 0;
+  });
+
 const receiptIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   const issues: Schema.FilterIssue[] = [];
   const engines = report.engines.map((receipt) => receipt.engine);
@@ -115,11 +152,34 @@ const receiptIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
     inventory === undefined ||
     inventory.length === 0 ||
     new Set(inventory).size !== inventory.length ||
+    !isOrdered(inventory, compareCodeUnits) ||
     report.engines.some(
       (receipt) => !sameStrings(receipt.analyzedFiles, inventory)
     )
   ) {
     issues.push("Provider receipts must prove one identical file inventory");
+  }
+  return issues;
+};
+
+const findingIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
+  const issues: Schema.FilterIssue[] = [];
+  const inventory = new Set(report.engines.at(0)?.analyzedFiles);
+  if (
+    report.findings.some((finding) => !inventory.has(finding.location.file))
+  ) {
+    issues.push("Every finding must belong to the analyzed file inventory");
+  }
+  if (
+    report.findings.some((finding) => {
+      const { fingerprint: _fingerprint, ...withoutFingerprint } = finding;
+      return fingerprintFinding(withoutFingerprint) !== finding.fingerprint;
+    })
+  ) {
+    issues.push("Every finding fingerprint must match its canonical content");
+  }
+  if (!isOrdered(report.findings, compareFindingOrder)) {
+    issues.push("Scan findings must use canonical order");
   }
   return issues;
 };
@@ -154,6 +214,7 @@ const summaryIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
 export const ScanReportSchema = ScanReportWire.check(
   Schema.makeFilter((report) => [
     ...receiptIssues(report),
+    ...findingIssues(report),
     ...versionIssues(report),
     ...summaryIssues(report),
   ])
@@ -192,23 +253,26 @@ const sameFindingIdentity = (left: Finding, right: Finding): boolean =>
   left.location.end.line === right.location.end.line &&
   left.location.end.column === right.location.end.column;
 
-const containsFindingMultiset = (
-  source: readonly Finding[],
-  subset: readonly Finding[]
-): boolean => {
-  const slots = source.map((finding) => ({ finding, used: false }));
-  for (const finding of subset) {
-    const slot = slots.find(
-      (candidate) =>
-        !candidate.used && sameFindingIdentity(candidate.finding, finding)
-    );
-    if (slot === undefined) {
-      return false;
-    }
-    slot.used = true;
-  }
-  return true;
-};
+const sameFinding = (left: Finding, right: Finding): boolean =>
+  sameFindingIdentity(left, right) &&
+  left.category === right.category &&
+  left.evidence === right.evidence &&
+  left.message === right.message &&
+  left.provenance.engine === right.provenance.engine &&
+  left.provenance.nativeRuleId === right.provenance.nativeRuleId &&
+  left.ruleId === right.ruleId &&
+  left.severity === right.severity &&
+  left.title === right.title;
+
+const sameFindings = (
+  left: readonly Finding[],
+  right: readonly Finding[]
+): boolean =>
+  left.length === right.length &&
+  left.every((finding, index) => {
+    const candidate = right[index];
+    return candidate !== undefined && sameFinding(finding, candidate);
+  });
 
 const comparisonVersionIssues = (
   report: ComparisonReportWire
@@ -225,13 +289,14 @@ const comparisonVersionIssues = (
 const comparisonDeltaIssues = (
   report: ComparisonReportWire
 ): Schema.FilterIssue[] => {
-  const baselineCount = report.resolved.length + report.unchangedCount;
-  const candidateCount = report.introduced.length + report.unchangedCount;
+  const expected = compareFindings(
+    report.baseline.findings,
+    report.candidate.findings
+  );
   if (
-    baselineCount !== report.baseline.findings.length ||
-    candidateCount !== report.candidate.findings.length ||
-    !containsFindingMultiset(report.baseline.findings, report.resolved) ||
-    !containsFindingMultiset(report.candidate.findings, report.introduced)
+    report.unchangedCount !== expected.unchanged.length ||
+    !sameFindings(report.introduced, expected.introduced) ||
+    !sameFindings(report.resolved, expected.resolved)
   ) {
     return ["Comparison delta must partition baseline and candidate findings"];
   }

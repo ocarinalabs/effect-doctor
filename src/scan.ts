@@ -3,7 +3,7 @@ import { FileSystem, Path, Effect } from "effect";
 
 import { ProjectFailure } from "./errors.js";
 import type { DoctorFailure } from "./errors.js";
-import { compareCodeUnits } from "./internal/order.js";
+import { compareFindingOrder } from "./internal/finding-order.js";
 import {
   normalizeOxlintFindings,
   oxlintProviderReceipts,
@@ -38,13 +38,6 @@ const summarize = (findings: readonly Finding[]): FindingSummary => ({
   errors: findings.filter((finding) => finding.severity === "error").length,
   warnings: findings.filter((finding) => finding.severity === "warning").length,
 });
-
-const compareFindings = (left: Finding, right: Finding): number =>
-  compareCodeUnits(left.location.file, right.location.file) ||
-  left.location.start.line - right.location.start.line ||
-  left.location.start.column - right.location.start.column ||
-  compareCodeUnits(left.ruleId, right.ruleId) ||
-  compareCodeUnits(left.message, right.message);
 
 const resolveProjectRoot = Effect.fn("resolveProjectRoot")(function* (
   requestedRoot: string
@@ -141,7 +134,9 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
     tsgoAnalysis.output.files
   );
   const tsgoFindings = yield* normalizeTsgoFindings(tsgoAnalysis, sources);
-  const findings = [...tsgoFindings, ...oxlintFindings].sort(compareFindings);
+  const findings = [...tsgoFindings, ...oxlintFindings].sort(
+    compareFindingOrder
+  );
   yield* verifyProjectSnapshot(snapshot, toolchain.tsgoExecutable);
   return makeReport(receipts, findings, toolchain.versions);
 });

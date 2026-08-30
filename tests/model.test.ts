@@ -82,6 +82,50 @@ describe("ScanReportSchema", () => {
 
     expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
   });
+
+  it.each(["/tmp/main.ts", "../main.ts", "src\\main.ts"])(
+    "rejects a non-project-relative inventory path: %s",
+    (file) => {
+      const valid = makeScanReport();
+      const report = {
+        ...valid,
+        engines: valid.engines.map((receipt) => ({
+          ...receipt,
+          analyzedFiles: [file],
+        })),
+      };
+
+      expect(() =>
+        Schema.decodeUnknownSync(ScanReportSchema)(report)
+      ).toThrow();
+    }
+  );
+
+  it("rejects a noncanonical provider inventory order", () => {
+    const valid = makeScanReport();
+    const report = {
+      ...valid,
+      engines: valid.engines.map((receipt) => ({
+        ...receipt,
+        analyzedFiles: ["src/z.ts", "src/a.ts"],
+      })),
+    };
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
+
+  it("rejects a finding outside the provider inventory", () => {
+    const report = makeScanReport([makeFinding({ file: "src/other.ts" })]);
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
+
+  it("rejects a finding with a forged fingerprint", () => {
+    const finding = { ...makeFinding(), fingerprint: "forged" };
+    const report = makeScanReport([finding]);
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
 });
 
 describe("ComparisonReportSchema", () => {
@@ -110,6 +154,25 @@ describe("ComparisonReportSchema", () => {
       candidate: makeScanReport([finding]),
       doctorVersion: "0.1.0",
       introduced: [finding],
+      kind: "comparison",
+      resolved: [],
+      schema: "effect-doctor/comparison/v1",
+      unchangedCount: 1,
+    } as const;
+
+    expect(() =>
+      Schema.decodeUnknownSync(ComparisonReportSchema)(report)
+    ).toThrow();
+  });
+
+  it("rejects a false delta with plausible counts", () => {
+    const baseline = makeFinding({ evidence: "baseline" });
+    const candidate = makeFinding({ evidence: "candidate" });
+    const report = {
+      baseline: makeScanReport([baseline]),
+      candidate: makeScanReport([candidate]),
+      doctorVersion: "0.1.0",
+      introduced: [],
       kind: "comparison",
       resolved: [],
       schema: "effect-doctor/comparison/v1",
