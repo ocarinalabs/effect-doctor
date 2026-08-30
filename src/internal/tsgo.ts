@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { dirname, resolve as resolvePath, win32 } from "node:path";
 
 import { FileSystem, Path, Effect } from "effect";
 
@@ -125,11 +125,25 @@ export type AnalyzedSource = {
   readonly source: string;
 };
 
+const usesWindowsPathSemantics = (value: string): boolean =>
+  process.platform === "win32" ||
+  /^[A-Za-z]:[\\/]/u.test(value) ||
+  value.startsWith("\\\\");
+
+const providerPathIdentity = (value: string): string =>
+  usesWindowsPathSemantics(value)
+    ? win32.normalize(value).toLowerCase()
+    : resolvePath(value);
+
 const sourceForDiagnostic = (
   diagnostic: TsgoDiagnostic,
   sources: readonly AnalyzedSource[]
-): AnalyzedSource | undefined =>
-  sources.find((source) => source.absolute === diagnostic.file);
+): AnalyzedSource | undefined => {
+  const diagnosticPath = providerPathIdentity(diagnostic.file);
+  return sources.find(
+    (source) => providerPathIdentity(source.absolute) === diagnosticPath
+  );
+};
 
 const positionAtOffset = (
   source: string,

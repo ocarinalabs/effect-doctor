@@ -97,6 +97,41 @@ describe("decodeTsgoOutput", () => {
 });
 
 describe("normalizeTsgoFindings", () => {
+  it("matches Windows diagnostics to native snapshot paths", async () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    const file = wire.files.at(0);
+    expect(diagnostic).toBeDefined();
+    expect(file).toBeDefined();
+    if (diagnostic === undefined || file === undefined) {
+      return;
+    }
+    diagnostic.file = "d:/workspace/src/main.ts";
+    diagnostic.start = 12;
+    file.file = diagnostic.file;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    await expect(
+      Effect.runPromise(
+        normalizeTsgoFindings({ files: [diagnostic.file], output }, [
+          {
+            absolute: "D:\\workspace\\src\\main.ts",
+            relative: "src/main.ts",
+            source: "const x =\n  Effect.void",
+          },
+        ])
+      )
+    ).resolves.toMatchObject([
+      {
+        evidence: "Effect",
+        location: {
+          file: "src/main.ts",
+          start: { column: 3, line: 2 },
+        },
+      },
+    ]);
+  });
+
   it("rejects a diagnostic code that belongs to a different rule name", async () => {
     const wire = structuredClone(validOutput);
     const diagnostic = wire.diagnostics.at(0);
