@@ -14,6 +14,7 @@ import type {
   ProviderReceipt,
 } from "../model.js";
 import { ruleForTsgoDiagnostic, tsgoDiagnosticSeverity } from "../rules.js";
+import type { RuleCatalogEntry } from "../rules.js";
 import { compareCodeUnits } from "./order.js";
 import { runProcess } from "./process.js";
 import type { ProjectSnapshot } from "./project-snapshot.js";
@@ -129,78 +130,143 @@ const sourceForDiagnostic = (
 ): AnalyzedSource | undefined =>
   sources.find((source) => source.absolute === diagnostic.file);
 
+const positionAtOffset = (
+  source: string,
+  offset: number
+): { readonly column: number; readonly line: number } | undefined => {
+  if (offset > source.length) {
+    return undefined;
+  }
+  const lines = source.slice(0, offset).split(/\r?\n/u);
+  return {
+    column: (lines.at(-1) ?? "").length + 1,
+    line: lines.length,
+  };
+};
+
+const hasValidSpan = (diagnostic: TsgoDiagnostic, source: string): boolean => {
+  const start = positionAtOffset(source, diagnostic.start);
+  const end = positionAtOffset(source, diagnostic.start + diagnostic.length);
+  return (
+    start !== undefined &&
+    end !== undefined &&
+    start.line === diagnostic.line &&
+    start.column === diagnostic.column &&
+    end.line === diagnostic.endLine &&
+    end.column === diagnostic.endColumn
+  );
+};
+
+const ruleForTsgoFinding = Effect.fn("ruleForTsgoFinding")(function* (
+  diagnostic: TsgoDiagnostic
+) {
+  const rule = ruleForTsgoDiagnostic(diagnostic.name, diagnostic.code);
+  if (rule?.source === "effect-doctor") {
+    return undefined;
+  }
+  if (rule === undefined || rule.source !== "effect-tsgo") {
+    return yield* new InvalidAnalyzerOutput({
+      engine: "effect-tsgo",
+      message: `Effect TSGo emitted unknown diagnostic: ${diagnostic.name}`,
+    });
+  }
+  return rule;
+});
+
+const validateTsgoRule = Effect.fn("validateTsgoRule")(function* (
+  analysis: TsgoAnalysis,
+  diagnostic: TsgoDiagnostic,
+  rule: RuleCatalogEntry
+) {
+  const configuredSeverity = tsgoDiagnosticSeverity[rule.providerRuleId];
+  if (
+    !rule.defaultEnabled ||
+    configuredSeverity === undefined ||
+    configuredSeverity === "off" ||
+    configuredSeverity !== diagnostic.severity
+  ) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: "effect-tsgo",
+      message: `Effect TSGo diagnostic disagrees with catalog policy: ${diagnostic.name}`,
+    });
+  }
+  const fileVersion = analysis.output.files.find(
+    (file) => file.file === diagnostic.file
+  );
+  if (
+    fileVersion === undefined ||
+    !rule.supportedEffectVersions.includes(fileVersion.supportedEffect)
+  ) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: "effect-tsgo",
+      message: `Effect TSGo diagnostic is unsupported for the detected Effect version: ${diagnostic.name}`,
+    });
+  }
+});
+
+const requireTsgoSource = Effect.fn("requireTsgoSource")(function* (
+  diagnostic: TsgoDiagnostic,
+  sources: readonly AnalyzedSource[]
+) {
+  const source = sourceForDiagnostic(diagnostic, sources);
+  if (source === undefined) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: "effect-tsgo",
+      message: "Effect TSGo diagnostic source is outside the project snapshot.",
+    });
+  }
+  if (!hasValidSpan(diagnostic, source.source)) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: "effect-tsgo",
+      message: "Effect TSGo diagnostic span is outside the project snapshot.",
+    });
+  }
+  return source;
+});
+
+const makeTsgoFinding = (
+  diagnostic: TsgoDiagnostic,
+  rule: RuleCatalogEntry,
+  source: AnalyzedSource
+): Finding => {
+  const evidence = source.source.slice(
+    diagnostic.start,
+    diagnostic.start + diagnostic.length
+  );
+  const withoutFingerprint = {
+    category: rule.category,
+    evidence,
+    location: {
+      end: { column: diagnostic.endColumn, line: diagnostic.endLine },
+      file: source.relative,
+      start: { column: diagnostic.column, line: diagnostic.line },
+    },
+    message: diagnostic.message,
+    provenance: {
+      engine: "effect-tsgo",
+      nativeRuleId: diagnostic.name,
+    },
+    ruleId: rule.id,
+    severity: rule.defaultSeverity,
+    title: rule.title,
+  } satisfies FindingWithoutFingerprint;
+  return {
+    ...withoutFingerprint,
+    fingerprint: fingerprintFinding(withoutFingerprint),
+  };
+};
+
 export const normalizeTsgoFindings = Effect.fn("normalizeTsgoFindings")(
   function* (analysis: TsgoAnalysis, sources: readonly AnalyzedSource[]) {
     const findings: Finding[] = [];
     for (const diagnostic of analysis.output.diagnostics) {
-      const rule = ruleForTsgoDiagnostic(diagnostic.name, diagnostic.code);
-      if (rule?.source === "effect-doctor") {
+      const rule = yield* ruleForTsgoFinding(diagnostic);
+      if (rule === undefined) {
         continue;
       }
-      if (rule === undefined || rule.source !== "effect-tsgo") {
-        return yield* new InvalidAnalyzerOutput({
-          engine: "effect-tsgo",
-          message: `Effect TSGo emitted unknown diagnostic: ${diagnostic.name}`,
-        });
-      }
-      const configuredSeverity = tsgoDiagnosticSeverity[rule.providerRuleId];
-      if (
-        !rule.defaultEnabled ||
-        configuredSeverity === undefined ||
-        configuredSeverity === "off" ||
-        configuredSeverity !== diagnostic.severity
-      ) {
-        return yield* new InvalidAnalyzerOutput({
-          engine: "effect-tsgo",
-          message: `Effect TSGo diagnostic disagrees with catalog policy: ${diagnostic.name}`,
-        });
-      }
-      const fileVersion = analysis.output.files.find(
-        (file) => file.file === diagnostic.file
-      );
-      if (
-        fileVersion === undefined ||
-        !rule.supportedEffectVersions.includes(fileVersion.supportedEffect)
-      ) {
-        return yield* new InvalidAnalyzerOutput({
-          engine: "effect-tsgo",
-          message: `Effect TSGo diagnostic is unsupported for the detected Effect version: ${diagnostic.name}`,
-        });
-      }
-      const source = sourceForDiagnostic(diagnostic, sources);
-      if (source === undefined) {
-        return yield* new InvalidAnalyzerOutput({
-          engine: "effect-tsgo",
-          message:
-            "Effect TSGo diagnostic source is outside the project snapshot.",
-        });
-      }
-      const evidence = source.source.slice(
-        diagnostic.start,
-        diagnostic.start + diagnostic.length
-      );
-      const withoutFingerprint = {
-        category: rule.category,
-        evidence,
-        location: {
-          end: { column: diagnostic.endColumn, line: diagnostic.endLine },
-          file: source.relative,
-          start: { column: diagnostic.column, line: diagnostic.line },
-        },
-        message: diagnostic.message,
-        provenance: {
-          engine: "effect-tsgo",
-          nativeRuleId: diagnostic.name,
-        },
-        ruleId: rule.id,
-        severity: rule.defaultSeverity,
-        title: rule.title,
-      } satisfies FindingWithoutFingerprint;
-
-      findings.push({
-        ...withoutFingerprint,
-        fingerprint: fingerprintFinding(withoutFingerprint),
-      });
+      yield* validateTsgoRule(analysis, diagnostic, rule);
+      const source = yield* requireTsgoSource(diagnostic, sources);
+      findings.push(makeTsgoFinding(diagnostic, rule, source));
     }
     return findings;
   }

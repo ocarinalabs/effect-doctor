@@ -239,4 +239,30 @@ describe("normalizeTsgoFindings", () => {
       engine: "effect-tsgo",
     });
   });
+
+  it("rejects a diagnostic span outside the snapshotted source", async () => {
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    diagnostic.start = 99;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    await expect(
+      Effect.runPromise(
+        normalizeTsgoFindings({ files: ["/workspace/src/main.ts"], output }, [
+          {
+            absolute: "/workspace/src/main.ts",
+            relative: "src/main.ts",
+            source: "Effect.void",
+          },
+        ])
+      )
+    ).rejects.toMatchObject({
+      _tag: "InvalidAnalyzerOutput",
+      engine: "effect-tsgo",
+    });
+  });
 });

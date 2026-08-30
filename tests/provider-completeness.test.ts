@@ -24,6 +24,14 @@ const snapshot = {
   tsconfig: "/project/tsconfig.json",
 } satisfies ProjectSnapshot;
 
+const v4Files = [
+  {
+    detectedEffect: "v4",
+    file: "/project/src/main.ts",
+    supportedEffect: "v4",
+  },
+] as const;
+
 describe("provider completeness", () => {
   it("rejects a first-party plugin receipt with missing file canaries", async () => {
     await expect(
@@ -73,7 +81,8 @@ describe("provider completeness", () => {
           },
         ],
       },
-      snapshot.files
+      snapshot.files,
+      v4Files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).rejects.toMatchObject({
@@ -100,12 +109,72 @@ describe("provider completeness", () => {
           },
         ],
       },
-      snapshot.files
+      snapshot.files,
+      v4Files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).rejects.toMatchObject({
       _tag: "InvalidAnalyzerOutput",
       engine: "effect-doctor",
     });
+  });
+
+  it("rejects an Oxlint span outside the snapshotted source", async () => {
+    const effect = normalizeOxlintFindings(
+      "/project",
+      {
+        diagnostics: [
+          {
+            code: "effect(noUnboundedRetry)",
+            filename: "/project/src/main.ts",
+            labels: [
+              {
+                span: { column: 1, length: 1, line: 1, offset: 99 },
+              },
+            ],
+            message: "Bound retry attempts or elapsed time.",
+            severity: "error",
+          },
+        ],
+      },
+      snapshot.files,
+      v4Files
+    ).pipe(Effect.provide(NodeServices.layer));
+
+    await expect(Effect.runPromise(effect)).rejects.toMatchObject({
+      _tag: "InvalidAnalyzerOutput",
+      engine: "effect-oxlint",
+    });
+  });
+
+  it("does not report a v4-only Oxlint rule for a v3 file", async () => {
+    const effect = normalizeOxlintFindings(
+      "/project",
+      {
+        diagnostics: [
+          {
+            code: "effect-doctor(consistent-effect-fn-name)",
+            filename: "/project/src/main.ts",
+            labels: [
+              {
+                span: { column: 1, length: 6, line: 1, offset: 0 },
+              },
+            ],
+            message: "Keep the Effect.fn name consistent.",
+            severity: "warning",
+          },
+        ],
+      },
+      snapshot.files,
+      [
+        {
+          detectedEffect: "v3",
+          file: "/project/src/main.ts",
+          supportedEffect: "v3",
+        },
+      ]
+    ).pipe(Effect.provide(NodeServices.layer));
+
+    await expect(Effect.runPromise(effect)).resolves.toEqual([]);
   });
 });

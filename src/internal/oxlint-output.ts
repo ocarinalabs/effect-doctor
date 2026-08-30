@@ -1,9 +1,13 @@
 import { Schema } from "effect";
 
+const PositiveInt = Schema.Int.pipe(
+  Schema.check(Schema.isGreaterThanOrEqualTo(1))
+);
+
 const OxlintSpanSchema = Schema.Struct({
-  column: Schema.Natural,
+  column: PositiveInt,
   length: Schema.Natural,
-  line: Schema.Natural,
+  line: PositiveInt,
   offset: Schema.Natural,
 });
 

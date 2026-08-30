@@ -105,5 +105,6 @@ const TsgoOutputJsonSchema = Schema.fromJsonString(TsgoOutputSchema);
 
 export type TsgoOutput = typeof TsgoOutputSchema.Type;
 export type TsgoDiagnostic = typeof TsgoDiagnosticSchema.Type;
+export type TsgoFile = typeof TsgoFileSchema.Type;
 
 export const decodeTsgoOutput = Schema.decodeSync(TsgoOutputJsonSchema);
