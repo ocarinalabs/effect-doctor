@@ -165,6 +165,25 @@ try {
   const [packed] = JSON.parse(packOutput);
   assert(packed.name === manifest.name, "The tarball package name changed");
   assert(packed.version === manifest.version, "The tarball version changed");
+  const packageFiles = packed.files.map((file) => file.path);
+  for (const requiredFile of [
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "docs/README.md",
+    "docs/release.md",
+    "docs/research/README.md",
+  ]) {
+    assert(
+      packageFiles.includes(requiredFile),
+      `The tarball does not include ${requiredFile}`
+    );
+  }
+  assert(
+    packageFiles.every((file) => !file.endsWith(".map")),
+    "The tarball contains source maps without packaged source"
+  );
   const archive = join(tarballDirectory, packed.filename);
 
   run({
@@ -300,6 +319,7 @@ try {
     libraryExports,
     package: {
       filename: packed.filename,
+      fileCount: packageFiles.length,
       integrity: packed.integrity,
       name: packed.name,
       version: packed.version,

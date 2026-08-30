@@ -18,9 +18,18 @@
     "effect-doctor": "dist/bin.js"
   },
   "files": [
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "dist",
+    "docs/architecture.md",
+    "docs/README.md",
+    "docs/release.md",
+    "docs/research/README.md",
     "LICENSE",
     "README.md",
+    "SECURITY.md",
+    "SUPPORT.md",
     "THIRD_PARTY_NOTICES.md"
   ],
   "type": "module",

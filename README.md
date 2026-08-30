@@ -1,85 +1,121 @@
 # Effect Doctor
 
-Effect Doctor is a deterministic quality analyzer for [Effect](https://effect.website/) TypeScript. It gives humans, CI, and coding-agent evaluations one black-box interface over three independently identified diagnostic sources:
+Effect Doctor is a deterministic analyzer for Effect TypeScript projects. It gives developers, CI, and coding-agent evaluations one fail-closed interface over:
 
-- **Effect TSGo** for official, type-aware Effect diagnostics.
-- **Effect Oxlint** for a curated set of high-confidence structural rules.
-- **Effect Doctor** for host-neutral first-party integrity and security rules executed by Oxlint.
+- Effect TSGo's official type-aware diagnostics;
+- a curated subset of `oxlint-plugin-effect`; and
+- Effect Doctor's own integrity, security, and resource-safety checks.
 
-The output is a versioned report with stable ordering, project-relative paths, rule provenance, source evidence, and an explicit file inventory for every provider receipt. If any required analyzer cannot prove complete coverage, the scan fails instead of reporting a false clean result.
+A successful empty report means all three providers analyzed the same project snapshot. Missing files, unknown diagnostics, malformed spans, incomplete providers, and project changes during a scan are operational failures, not clean results.
 
-## Usage
+## Requirements
+
+- Node.js 22.18 or newer.
+- An Effect TypeScript project with a root `tsconfig.json`.
+- The target project's dependencies installed in that checkout.
+
+Effect Doctor is ESM-only. Its bundled analyzer toolchain is pinned; the rule catalog records each rule's Effect v3 and v4 compatibility separately.
+
+## Quick start
+
+Install the exact release you intend to use:
 
 ```sh
-effect-doctor .
-effect-doctor . --format json
-effect-doctor compare ../baseline . --format json
+npm install --save-dev --save-exact @ocarinalabs/effect-doctor@0.1.0
+npx effect-doctor .
+```
+
+A clean project prints output like:
+
+```text
+Effect Doctor analyzed 4 file(s): 0 error(s), 0 warning(s), 0 advice finding(s)
+```
+
+Pinning the version matters in CI and benchmarks because provider versions and rule policy are part of the result.
+
+## CLI
+
+```sh
+effect-doctor <project>
+effect-doctor <project> --format json
+effect-doctor compare <baseline> <candidate> --format json
 effect-doctor rules list
 effect-doctor rules explain effect/floating-effect
 ```
 
-`compare` is the preferred benchmark and pull-request interface. It reports only introduced and resolved findings, while matching existing findings across line shifts and file moves by normalized evidence. Duplicate findings retain their multiplicity, so copying an existing defect still introduces a finding.
+`compare` is the preferred pull-request and benchmark interface. It matches existing findings across line shifts and file moves, preserves duplicate multiplicity, and blocks only on introduced findings.
 
-Exit codes are intentionally process-friendly:
+To compare a branch, create a second checkout at the baseline revision, install that checkout's dependencies, and pass both directories to `compare`. For example:
 
-| Code | Meaning                                                          |
-| ---: | ---------------------------------------------------------------- |
-|  `0` | Analysis completed and no finding crossed the blocking threshold |
-|  `1` | Analysis completed and a finding crossed the blocking threshold  |
-|  `2` | Analysis was incomplete or could not start                       |
+```sh
+git worktree add ../project-baseline origin/main
+(cd ../project-baseline && npm ci)
+npx effect-doctor compare ../project-baseline . --format json
+git worktree remove ../project-baseline
+```
 
-Use `--blocking error`, `--blocking warning`, or `--blocking never` to select the threshold. Advice remains visible without blocking by default.
+Exit codes distinguish findings from analyzer failure:
 
-## Quality policy
+| Code | Meaning                                                           |
+| ---: | ----------------------------------------------------------------- |
+|  `0` | Analysis completed and no finding crossed the blocking threshold  |
+|  `1` | Analysis completed and at least one finding crossed the threshold |
+|  `2` | Analysis was incomplete or could not start                        |
 
-Effect Doctor does not enable the entire community lint preset. Blanket bans on `async`, nullish values, ternaries, globals, Node adapters, or `try/catch` are team conventions, not universal evidence that Effect code is wrong.
+Use `--blocking error`, `--blocking warning`, or `--blocking never` to choose the threshold. Advice is visible but non-blocking by default.
 
-The checked-in catalog contains all 155 known rules: 99 Effect TSGo rules, all 40 `oxlint-plugin-effect` rules, and 16 first-party Effect Doctor rules. It is also the only source used to build provider configuration, normalize findings, and implement `rules list` and `rules explain`. Of those rules, 59 are enabled by default: the 28 upstream TSGo defaults, 15 curated Oxlint rules, and all 16 first-party rules.
+`rules list` emits tab-separated terminal output. JSON scan and comparison reports are the stable machine interfaces.
 
-The default Oxlint profile is deliberately narrower. Seven strong safety checks block at error severity:
+## Node API
 
-- chained type assertions;
-- managed-runtime construction inside an Effect;
-- per-call cache construction;
-- collecting a clearly unbounded stream;
-- unbounded concurrency or retry; and
-- widening followed by an assertion.
+The package root exports Effect-returning scan and comparison functions, runtime report schemas, rule metadata, renderers, blocking helpers, and the typed failure cases.
 
-Eight broadly useful conventions remain non-blocking advice: module-mock avoidance, object-parameter review, sequential `Effect.all` review, tagged-error helpers, exhaustive tagged matching, tagged predicates, `ServiceMap.Service` construction, and named Effect functions. Preview, TSGo-delegated, and policy-only Oxlint rules remain visible but disabled.
+```ts
+import { Effect } from "effect";
+import {
+  scanProject,
+  type DoctorFailure,
+  type ScanReport,
+} from "@ocarinalabs/effect-doctor";
 
-First-party advice inventories diagnostic suppressions and covers narrowly provable configuration, runtime, Effect-generator failure, logging, telemetry, HTTP, SQL, Layer identity/lifetime, callback, Chunk aliasing, Schema compilation, tracing-name, and redaction mistakes. A hidden primary-pass file canary is never reported; it proves that Oxlint executed the JavaScript plugin exactly once over every planned source file. Suppression integrity uses a separate directive-immune Oxlint pass so a disable directive cannot hide itself.
+const program: Effect.Effect<ScanReport, DoctorFailure> = scanProject({
+  root: process.cwd(),
+});
 
-Provider rule names are preserved in `provenance`; Effect Doctor also maps them to stable public rule IDs. First-party rules require adversarial valid and invalid fixtures before they can become blocking diagnostics.
+const report = await Effect.runPromise(program);
+```
+
+`ProjectFailure`, `AnalyzerFailure`, and `InvalidAnalyzerOutput` are also exported for `_tag`-based handling. Do not import from `dist/*` or `src/*`.
 
 ## Report contract
 
-JSON scans use `effect-doctor/scan/v1`; comparisons use `effect-doctor/comparison/v1`. Runtime schemas for both reports are exported from `@ocarinalabs/effect-doctor`.
+Scans use `effect-doctor/scan/v1`, comparisons use `effect-doctor/comparison/v1`, and CLI failures use `effect-doctor/error/v1`. Successful reports have stable ordering, project-relative paths, source evidence, canonical rule IDs, provider provenance, and exact analyzed-file receipts.
 
-Reports intentionally contain no timestamps, durations, temporary paths, hostnames, scores, raw compiler output, or network-derived data. Effect Doctor never edits the target project and verifies that its expanded configuration, exact source inventory, and source contents remain unchanged during analysis.
+Reports intentionally omit timestamps, durations, hostnames, temporary paths, scores, and raw compiler output. Effect Doctor does not edit the target project. It rechecks the expanded TypeScript plan, source inventory, configuration, and source digests before returning.
 
-See [the architecture guide](docs/architecture.md) for catalog ownership, snapshot planning, provider receipts, execution modes, and clean-room parity goals.
+The suppression-integrity provider writes same-length masked copies of source files to a private operating-system temporary directory. Normal completion and interruption remove that directory; a host crash or `SIGKILL` can leave it behind.
 
-See [the first-party rule contracts](docs/research/first-party-rules.md) for official provenance, deliberate abstentions, rejected candidates, adversarial fixtures, and pinned-corpus calibration.
+## Rule policy
 
-See [the Kit Effect skill audit](docs/research/kit-effect-skill-audit.md) for the recommendation-by-recommendation ownership and enforceability decisions.
+The generated catalog is the source of truth for every known TSGo, Effect Oxlint, and first-party rule. `rules list` and `rules explain` show which rules are blocking, advisory, preview, delegated, or rejected.
 
-See [the additional guidance audit](docs/research/ecosystem/additional-guidance-rule-audit.md) for the complete Effect Solutions, Joel Hooks, Biome, and Betalyra PR inventory and the admitted, delegated, rejected, and research-only dispositions.
+Effect Doctor does not enable a whole community preset. Syntax bans such as forbidding every `async`, ternary, nullish value, global, Node adapter, or `try/catch` express local style policy unless a rule can prove an Effect-specific defect. First-party rules require invalid, close-valid, aliasing, and shadowing fixtures before admission.
 
 ## Development
 
 ```sh
-bun install
+bun install --frozen-lockfile
 bun run setup:effect
-bun run catalog:check
 bun run check
 bun run audit
 bun run doctor:self
-bun run bench
-npm pack --dry-run
+bun run verify:package
 ```
 
-The implementation itself uses Effect 4 and is checked with Effect TSGo, `oxlint-plugin-effect`, Ultracite, and Fallow. The packaged CLI is the boundary intended for EffectBench; Effect Doctor does not import benchmark tasks, treatments, trials, rewards, or model configuration.
+`bun run verify:package` packs the current checkout, installs it into a fresh consumer with lifecycle scripts disabled, drives the installed CLI and Node API, proves all providers completed, and verifies that target fixtures were not edited.
 
-## Prior art and independence
+See [the documentation index](docs/README.md), [contribution guide](CONTRIBUTING.md), [security policy](SECURITY.md), and [changelog](CHANGELOG.md).
 
-React Doctor informed the high-level idea of pairing behavioral verification with deterministic framework-specific analysis. Agent Doctor was reviewed as prior art. Effect Doctor is an independent implementation: neither project is a runtime dependency, and no source, tests, messages, thresholds, or rule implementations were copied.
+## Prior art
+
+React Doctor informed the product-level pattern of pairing behavioral tests with deterministic framework-specific analysis. Agent Doctor was reviewed as prior art. Effect Doctor is an independent implementation; neither project is a runtime dependency, and their source, tests, messages, thresholds, and rule implementations are not included.
