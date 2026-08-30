@@ -1,4 +1,7 @@
-import { Effect, Schema, Stream } from "effect";
+import { Buffer } from "node:buffer";
+import { env } from "node:process";
+
+import { Chunk, Effect, Schema, Stream } from "effect";
 import type { Duration } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
@@ -16,8 +19,70 @@ type ProcessRequest = {
   readonly executable: string;
   readonly arguments: readonly string[];
   readonly cwd: string;
+  readonly maxOutputBytes?: number | undefined;
   readonly timeout?: Duration.Input;
 };
+
+const DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
+
+const CHILD_ENVIRONMENT = {
+  APPDATA: env.APPDATA,
+  COMSPEC: env.COMSPEC,
+  FORCE_COLOR: "0",
+  HOME: env.HOME,
+  LC_ALL: "C",
+  LOCALAPPDATA: env.LOCALAPPDATA,
+  NO_COLOR: "1",
+  PATH: env.PATH,
+  PATHEXT: env.PATHEXT,
+  SYSTEMROOT: env.SYSTEMROOT,
+  TEMP: env.TEMP,
+  TMP: env.TMP,
+  TMPDIR: env.TMPDIR,
+  TZ: "UTC",
+  USERPROFILE: env.USERPROFILE,
+  WINDIR: env.WINDIR,
+};
+
+const OUTPUT_LIMIT_ERROR = "Analyzer output exceeded its byte limit";
+
+type OutputAccumulator = {
+  readonly bytes: number;
+  readonly chunks: Chunk.Chunk<Uint8Array>;
+};
+
+const emptyOutput = (): OutputAccumulator => ({
+  bytes: 0,
+  chunks: Chunk.empty(),
+});
+
+const appendOutput =
+  (maxOutputBytes: number) =>
+  (
+    output: OutputAccumulator,
+    bytes: Uint8Array
+  ): Effect.Effect<OutputAccumulator, typeof OUTPUT_LIMIT_ERROR> => {
+    const totalBytes = output.bytes + bytes.byteLength;
+    return totalBytes > maxOutputBytes
+      ? Effect.fail(OUTPUT_LIMIT_ERROR)
+      : Effect.succeed({
+          bytes: totalBytes,
+          chunks: Chunk.append(output.chunks, bytes),
+        });
+  };
+
+const decodeOutput = (output: OutputAccumulator): string =>
+  Buffer.concat(Chunk.toReadonlyArray(output.chunks), output.bytes).toString(
+    "utf-8"
+  );
+
+const collectOutput = <E, R>(
+  stream: Stream.Stream<Uint8Array, E, R>,
+  maxOutputBytes: number
+): Effect.Effect<string, E | typeof OUTPUT_LIMIT_ERROR, R> =>
+  Stream.runFoldEffect(stream, emptyOutput, appendOutput(maxOutputBytes)).pipe(
+    Effect.map(decodeOutput)
+  );
 
 export const runProcess = Effect.fn("runProcess")(function* (
   request: ProcessRequest
@@ -28,13 +93,8 @@ export const runProcess = Effect.fn("runProcess")(function* (
       const handle = yield* spawner.spawn(
         ChildProcess.make(request.executable, request.arguments, {
           cwd: request.cwd,
-          env: {
-            FORCE_COLOR: "0",
-            LC_ALL: "C",
-            NO_COLOR: "1",
-            TZ: "UTC",
-          },
-          extendEnv: true,
+          env: CHILD_ENVIRONMENT,
+          extendEnv: false,
           stderr: "pipe",
           stdin: "ignore",
           stdout: "pipe",
@@ -45,8 +105,14 @@ export const runProcess = Effect.fn("runProcess")(function* (
 
       const [stdout, stderr, exitCode] = yield* Effect.all(
         [
-          handle.stdout.pipe(Stream.decodeText(), Stream.mkString),
-          handle.stderr.pipe(Stream.decodeText(), Stream.mkString),
+          collectOutput(
+            handle.stdout,
+            request.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
+          ),
+          collectOutput(
+            handle.stderr,
+            request.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES
+          ),
           handle.exitCode,
         ],
         { concurrency: "unbounded" }
