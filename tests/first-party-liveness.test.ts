@@ -163,6 +163,7 @@ describe("first-party rule liveness", () => {
       'throw new Error("invalid package input");',
       'throw new Error("invalid named operation input");',
       'throw new Error("invalid direct operation input");',
+      'throw new Error("invalid wrapped generator input");',
       'throw new Error("invalid untraced operation input");',
       'throw new Error("invalid eager operation input");',
     ]);

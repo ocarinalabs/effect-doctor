@@ -14,6 +14,13 @@ export class AnalyzerFailure extends Schema.TaggedError<AnalyzerFailure>()(
     engine: Schema.Literals(["effect-tsgo", "effect-oxlint", "effect-doctor"]),
     exitCode: Schema.NullOr(Schema.Int),
     message: Schema.String,
+    reason: Schema.Literals([
+      "exit",
+      "output-limit",
+      "process",
+      "timeout",
+      "toolchain",
+    ]),
     stderr: Schema.String,
   }
 ) {}

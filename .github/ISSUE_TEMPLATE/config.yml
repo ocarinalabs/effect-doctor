@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/ocarinalabs/effect-doctor/security/policy
+    about: Report vulnerabilities privately; do not open a public issue.
+  - name: Ocarina Labs
+    url: https://www.ocarinalabs.ai/
+    about: Contact Ocarina Labs while repository access is restricted.

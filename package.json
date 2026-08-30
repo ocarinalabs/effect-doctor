@@ -1,16 +1,35 @@
 {
   "name": "@ocarinalabs/effect-doctor",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "Deterministic Effect TypeScript diagnostics for humans and coding-agent evaluations.",
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "lint",
+    "static-analysis",
+    "typescript"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ocarinalabs/effect-doctor.git"
+  },
   "bin": {
-    "effect-doctor": "./dist/bin.js"
+    "effect-doctor": "dist/bin.js"
   },
   "files": [
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "dist",
+    "docs/architecture.md",
+    "docs/README.md",
+    "docs/release.md",
+    "docs/research/README.md",
     "LICENSE",
     "README.md",
+    "SECURITY.md",
+    "SUPPORT.md",
     "THIRD_PARTY_NOTICES.md"
   ],
   "type": "module",
@@ -21,8 +40,13 @@
     },
     "./package.json": "./package.json"
   },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "audit": "fallow --fail-on-issues --threads 4",
+    "audit:dependencies": "bun audit --audit-level=high",
     "bench": "bun run build && node scripts/benchmark.mjs",
     "catalog:check": "node scripts/rule-catalog.mjs",
     "catalog:generate": "node scripts/rule-catalog.mjs --write",
@@ -35,7 +59,9 @@
     "setup:effect": "effect-tsgo patch --typescript --no-oxlint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify:package": "node scripts/verify-package.mjs",
+    "verify:release": "bun run audit:dependencies && bun run check && bun run audit && bun run doctor:self && bun run verify:package && npm pack --dry-run"
   },
   "dependencies": {
     "@effect/platform-node": "4.0.0-rc.112",

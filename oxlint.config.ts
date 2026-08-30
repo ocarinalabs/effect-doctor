@@ -74,7 +74,6 @@ export default defineConfig({
     "oxc/no-barrel-file": "off",
     "promise/avoid-new": "off",
     "require-unicode-regexp": "off",
-    // Domain records read more naturally in semantic order than alphabetical order.
     "sort-keys": "off",
     "typescript/consistent-type-definitions": ["error", "type"],
     "unicorn/import-style": "off",

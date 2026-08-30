@@ -20,6 +20,7 @@ import {
   integrityOxlintRules,
   ruleForDiagnostic,
 } from "../rules.js";
+import type { RuleCatalogEntry } from "../rules.js";
 import { DOCTOR_VERSION } from "../version.js";
 import { INTEGRITY_VISIT_MESSAGE } from "./doctor-plugin.js";
 import { compareCodeUnits } from "./order.js";
@@ -27,6 +28,7 @@ import { decodeOxlintOutput } from "./oxlint-output.js";
 import type { OxlintDiagnostic } from "./oxlint-output.js";
 import { runProcess } from "./process.js";
 import type { ToolchainPaths } from "./toolchain.js";
+import type { TsgoFile } from "./tsgo-output.js";
 import type { AnalyzedSource } from "./tsgo.js";
 
 const CONFIG_CATEGORIES = {
@@ -77,10 +79,17 @@ const makeIntegrityConfig = (doctorPluginPath: string): string =>
   });
 
 export type OxlintAnalysis = {
-  readonly diagnostics: readonly OxlintDiagnostic[];
+  readonly diagnostics: readonly OxlintDiagnosticWithPass[];
 };
 
-type OxlintProcessAnalysis = OxlintAnalysis & {
+type OxlintPass = "primary" | "integrity";
+
+type OxlintDiagnosticWithPass = OxlintDiagnostic & {
+  readonly pass: OxlintPass;
+};
+
+type OxlintProcessAnalysis = {
+  readonly diagnostics: readonly OxlintDiagnostic[];
   readonly numberOfRules: number;
 };
 
@@ -182,6 +191,7 @@ const analyzeWithOxlint = Effect.fn("analyzeWithOxlint")(function* (
       engine,
       exitCode: result.exitCode,
       message: `Oxlint exited with code ${result.exitCode}`,
+      reason: "exit",
       stderr: "",
     });
   }
@@ -356,7 +366,16 @@ export const runOxlint = Effect.fn("runOxlint")(function* (
         sources
       );
       return {
-        diagnostics: [...primaryAnalysis.diagnostics, ...integrityDiagnostics],
+        diagnostics: [
+          ...primaryAnalysis.diagnostics.map((diagnostic) => ({
+            ...diagnostic,
+            pass: "primary" as const,
+          })),
+          ...integrityDiagnostics.map((diagnostic) => ({
+            ...diagnostic,
+            pass: "integrity" as const,
+          })),
+        ],
       } satisfies OxlintAnalysis;
     })
   );
@@ -372,14 +391,52 @@ const sourceForDiagnostic = (
   return sources.find((source) => source.absolute === absolute);
 };
 
+type OxlintSpan = OxlintDiagnostic["labels"][number]["span"];
+
+const positionAtByteOffset = (
+  source: Buffer,
+  offset: number
+): { readonly column: number; readonly line: number } | undefined => {
+  if (offset > source.byteLength) {
+    return undefined;
+  }
+  const prefix = source.subarray(0, offset).toString("utf-8");
+  if (Buffer.byteLength(prefix) !== offset) {
+    return undefined;
+  }
+  let line = 1;
+  for (const byte of source.subarray(0, offset)) {
+    if (byte === 0x0a) {
+      line += 1;
+    }
+  }
+  const lastNewline = source.subarray(0, offset).lastIndexOf(0x0a);
+  return {
+    column: offset - lastNewline,
+    line,
+  };
+};
+
 const extractEvidence = (
   source: string,
-  offset: number,
-  length: number
-): string =>
-  Buffer.from(source)
-    .subarray(offset, offset + length)
-    .toString("utf-8");
+  span: OxlintSpan
+): string | undefined => {
+  const bytes = Buffer.from(source);
+  const endOffset = span.offset + span.length;
+  const start = positionAtByteOffset(bytes, span.offset);
+  const end = positionAtByteOffset(bytes, endOffset);
+  if (
+    span.length === 0 ||
+    start === undefined ||
+    end === undefined ||
+    start.line !== span.line ||
+    start.column !== span.column
+  ) {
+    return undefined;
+  }
+  const evidence = bytes.subarray(span.offset, endOffset).toString("utf-8");
+  return Buffer.byteLength(evidence) === span.length ? evidence : undefined;
+};
 
 const endPosition = (
   line: number,
@@ -388,19 +445,142 @@ const endPosition = (
 ): { readonly line: number; readonly column: number } => {
   const lines = evidence.split(/\r?\n/u);
   if (lines.length === 1) {
-    return { column: column + [...evidence].length, line };
+    return { column: column + Buffer.byteLength(evidence), line };
   }
   return {
-    column: [...(lines.at(-1) ?? "")].length + 1,
+    column: Buffer.byteLength(lines.at(-1) ?? "") + 1,
     line: line + lines.length - 1,
   };
 };
+
+const requireOxlintSource = Effect.fn("requireOxlintSource")(function* (
+  root: string,
+  path: Path.Path,
+  diagnostic: OxlintDiagnostic,
+  sources: readonly AnalyzedSource[]
+) {
+  const source = sourceForDiagnostic(root, path, diagnostic, sources);
+  if (source === undefined) {
+    return yield* new ProjectFailure({
+      message: "Oxlint reported a file outside the project snapshot.",
+      root,
+    });
+  }
+  return source;
+});
+
+const requireOxlintRule = Effect.fn("requireOxlintRule")(function* (
+  diagnostic: OxlintDiagnosticWithPass
+) {
+  const rule = ruleForDiagnostic(diagnostic.code);
+  if (rule === undefined || rule.source === "effect-tsgo") {
+    return yield* new InvalidAnalyzerOutput({
+      engine: diagnostic.code.startsWith("effect-doctor(")
+        ? "effect-doctor"
+        : "effect-oxlint",
+      message: `Oxlint emitted unknown diagnostic: ${diagnostic.code}`,
+    });
+  }
+  return rule;
+});
+
+const configuredOxlintSeverity = (
+  rule: RuleCatalogEntry
+): "error" | "warn" | undefined => {
+  if (rule.source === "effect-oxlint") {
+    return effectOxlintRules[rule.providerRuleId];
+  }
+  return rule.execution === "oxlint-integrity"
+    ? integrityOxlintRules[rule.providerRuleId]
+    : doctorOxlintRules[rule.providerRuleId];
+};
+
+const validateOxlintPolicy = Effect.fn("validateOxlintPolicy")(function* (
+  diagnostic: OxlintDiagnosticWithPass,
+  rule: RuleCatalogEntry
+) {
+  const configuredSeverity = configuredOxlintSeverity(rule);
+  const expectedPass: OxlintPass =
+    rule.execution === "oxlint-integrity" ? "integrity" : "primary";
+  const expectedDiagnosticSeverity =
+    configuredSeverity === "error" ? "error" : "warning";
+  if (
+    !rule.defaultEnabled ||
+    configuredSeverity === undefined ||
+    diagnostic.pass !== expectedPass ||
+    diagnostic.severity !== expectedDiagnosticSeverity
+  ) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: rule.source,
+      message: "Oxlint diagnostic does not match the configured rule policy.",
+    });
+  }
+});
+
+const supportsOxlintFileVersion = Effect.fn("supportsOxlintFileVersion")(
+  function* (
+    root: string,
+    path: Path.Path,
+    rule: RuleCatalogEntry,
+    source: AnalyzedSource,
+    fileVersions: readonly TsgoFile[]
+  ) {
+    const fileVersion = fileVersions.find(
+      (file) => path.resolve(root, file.file) === source.absolute
+    );
+    if (fileVersion === undefined) {
+      return yield* new InvalidAnalyzerOutput({
+        engine: rule.source,
+        message: "Oxlint diagnostic has no Effect-version inventory.",
+      });
+    }
+    return rule.supportedEffectVersions.includes(fileVersion.supportedEffect);
+  }
+);
+
+const makeOxlintFinding = Effect.fn("makeOxlintFinding")(function* (
+  diagnostic: OxlintDiagnosticWithPass,
+  rule: RuleCatalogEntry,
+  source: AnalyzedSource
+) {
+  const [{ span }] = diagnostic.labels;
+  const evidence = extractEvidence(source.source, span);
+  if (evidence === undefined) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: rule.source,
+      message: "Oxlint diagnostic span is outside the project snapshot.",
+    });
+  }
+  const withoutFingerprint = {
+    category: rule.category,
+    evidence,
+    location: {
+      end: endPosition(span.line, span.column, evidence),
+      file: source.relative,
+      start: { column: span.column, line: span.line },
+    },
+    message: diagnostic.message,
+    provenance: {
+      engine: rule.source,
+      nativeRuleId:
+        rule.source === "effect-doctor" ? rule.nativeRuleId : diagnostic.code,
+    },
+    ruleId: rule.id,
+    severity: rule.defaultSeverity,
+    title: rule.title,
+  } satisfies FindingWithoutFingerprint;
+  return {
+    ...withoutFingerprint,
+    fingerprint: fingerprintFinding(withoutFingerprint),
+  } satisfies Finding;
+});
 
 export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
   function* (
     root: string,
     analysis: OxlintAnalysis,
-    sources: readonly AnalyzedSource[]
+    sources: readonly AnalyzedSource[],
+    fileVersions: readonly TsgoFile[]
   ) {
     const path = yield* Path.Path;
     const findings: Finding[] = [];
@@ -409,48 +589,25 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
       if (diagnostic.code === CANARY_DIAGNOSTIC_RULE) {
         continue;
       }
-      const source = sourceForDiagnostic(root, path, diagnostic, sources);
-      if (source === undefined) {
-        return yield* new ProjectFailure({
-          message: "Oxlint reported a file outside the project snapshot.",
-          root,
-        });
+      const source = yield* requireOxlintSource(
+        root,
+        path,
+        diagnostic,
+        sources
+      );
+      const rule = yield* requireOxlintRule(diagnostic);
+      yield* validateOxlintPolicy(diagnostic, rule);
+      const supported = yield* supportsOxlintFileVersion(
+        root,
+        path,
+        rule,
+        source,
+        fileVersions
+      );
+      if (!supported) {
+        continue;
       }
-      const rule = ruleForDiagnostic(diagnostic.code);
-      if (rule === undefined || rule.source === "effect-tsgo") {
-        return yield* new InvalidAnalyzerOutput({
-          engine: diagnostic.code.startsWith("effect-doctor(")
-            ? "effect-doctor"
-            : "effect-oxlint",
-          message: `Oxlint emitted unknown diagnostic: ${diagnostic.code}`,
-        });
-      }
-      const [{ span }] = diagnostic.labels;
-      const evidence = extractEvidence(source.source, span.offset, span.length);
-      const withoutFingerprint = {
-        category: rule.category,
-        evidence,
-        location: {
-          end: endPosition(span.line, span.column, evidence),
-          file: source.relative,
-          start: { column: span.column, line: span.line },
-        },
-        message: diagnostic.message,
-        provenance: {
-          engine: rule.source,
-          nativeRuleId:
-            rule.source === "effect-doctor"
-              ? rule.nativeRuleId
-              : diagnostic.code,
-        },
-        ruleId: rule.id,
-        severity: rule.defaultSeverity,
-        title: rule.title,
-      } satisfies FindingWithoutFingerprint;
-      findings.push({
-        ...withoutFingerprint,
-        fingerprint: fingerprintFinding(withoutFingerprint),
-      });
+      findings.push(yield* makeOxlintFinding(diagnostic, rule, source));
     }
 
     return findings;

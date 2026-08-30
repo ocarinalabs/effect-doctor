@@ -271,6 +271,7 @@ export const resolveToolchain = Effect.fn("resolveToolchain")(function* () {
         engine: "effect-doctor",
         message: "Bundled analyzer toolchain could not be validated.",
         exitCode: null,
+        reason: "toolchain",
         stderr: "",
       }),
     try: resolvePaths,

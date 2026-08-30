@@ -71,4 +71,21 @@ describe("decodeOxlintOutput", () => {
       /Missing key/u
     );
   });
+
+  it("rejects zero-based source positions", () => {
+    const output = structuredClone(validOutput);
+    const diagnostic = output.diagnostics.at(0);
+    expect(diagnostic).toBeDefined();
+    if (diagnostic === undefined) {
+      return;
+    }
+    const label = diagnostic.labels.at(0);
+    expect(label).toBeDefined();
+    if (label === undefined) {
+      return;
+    }
+    label.span.line = 0;
+
+    expect(() => decodeOxlintOutput(JSON.stringify(output), 1)).toThrowError();
+  });
 });

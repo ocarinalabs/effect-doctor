@@ -1,0 +1,41 @@
+name: Rule proposal or disagreement
+description: Propose a diagnostic, challenge a finding, or document a false-positive boundary.
+title: "rule: "
+labels: [rule]
+body:
+  - type: input
+    id: rule
+    attributes:
+      label: Rule ID or proposed name
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Effect contract
+      description: Link to pinned Effect source, official documentation, or another primary contract.
+    validations:
+      required: true
+  - type: textarea
+    id: invalid
+    attributes:
+      label: Invalid example and impact
+    validations:
+      required: true
+  - type: textarea
+    id: valid
+    attributes:
+      label: Close-valid and false-positive examples
+    validations:
+      required: true
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Likely diagnostic owner
+      options:
+        - Effect TSGo
+        - oxlint-plugin-effect
+        - Effect Doctor
+        - Unknown
+    validations:
+      required: true

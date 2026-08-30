@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 
 import { compareFindings } from "./delta.js";
+import type { DoctorFailure } from "./errors.js";
 import type { ComparisonReport } from "./model.js";
 import { scanProject } from "./scan.js";
 import { DOCTOR_VERSION } from "./version.js";
@@ -10,9 +11,11 @@ export type CompareRequest = {
   readonly candidateRoot: string;
 };
 
-export const compareProjects = Effect.fn("compareProjects")(function* (
+export const compareProjects: (
   request: CompareRequest
-) {
+) => Effect.Effect<ComparisonReport, DoctorFailure> = Effect.fn(
+  "compareProjects"
+)(function* (request) {
   const [baseline, candidate] = yield* Effect.all(
     [
       scanProject({ root: request.baselineRoot }),

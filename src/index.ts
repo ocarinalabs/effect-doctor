@@ -1,5 +1,11 @@
 export { compareFindings } from "./delta.js";
 export { compareProjects, type CompareRequest } from "./compare.js";
+export {
+  AnalyzerFailure,
+  InvalidAnalyzerOutput,
+  ProjectFailure,
+  type DoctorFailure,
+} from "./errors.js";
 export type {
   ComparisonReport,
   EngineRun,

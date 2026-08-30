@@ -101,14 +101,18 @@ const importedEffectMember = (
 
 const inlineGenerator = (
   arguments_: readonly ESTree.Argument[]
-): GeneratorFunction | undefined =>
-  arguments_.find((argument): argument is GeneratorFunction => {
+): GeneratorFunction | undefined => {
+  for (const argument of arguments_) {
     if (argument.type === "SpreadElement") {
-      return false;
+      continue;
     }
     const expression = unwrapExpression(argument);
-    return expression.type === "FunctionExpression" && expression.generator;
-  });
+    if (expression.type === "FunctionExpression" && expression.generator) {
+      return expression;
+    }
+  }
+  return undefined;
+};
 
 const directGenerator = (
   context: Context,
