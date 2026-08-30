@@ -1,8 +1,8 @@
 import { Buffer } from "node:buffer";
 import { env } from "node:process";
 
-import { Chunk, Effect, Schema, Stream } from "effect";
-import type { Duration } from "effect";
+import { Cause, Chunk, Effect, Schema, Stream } from "effect";
+import type { Duration, PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { AnalyzerFailure } from "../errors.js";
@@ -20,7 +20,7 @@ type ProcessRequest = {
   readonly arguments: readonly string[];
   readonly cwd: string;
   readonly maxOutputBytes?: number | undefined;
-  readonly timeout?: Duration.Input;
+  readonly timeout?: Duration.Input | undefined;
 };
 
 const DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
@@ -84,6 +84,40 @@ const collectOutput = <E, R>(
     Effect.map(decodeOutput)
   );
 
+const makeProcessFailure = (
+  request: ProcessRequest,
+  error:
+    | Cause.TimeoutError
+    | PlatformError.PlatformError
+    | typeof OUTPUT_LIMIT_ERROR
+): AnalyzerFailure => {
+  if (error === OUTPUT_LIMIT_ERROR) {
+    return new AnalyzerFailure({
+      engine: request.engine,
+      exitCode: null,
+      message: `${request.engine} output exceeded its byte limit.`,
+      reason: "output-limit",
+      stderr: "",
+    });
+  }
+  if (Cause.isTimeoutError(error)) {
+    return new AnalyzerFailure({
+      engine: request.engine,
+      exitCode: null,
+      message: `${request.engine} timed out.`,
+      reason: "timeout",
+      stderr: "",
+    });
+  }
+  return new AnalyzerFailure({
+    engine: request.engine,
+    exitCode: null,
+    message: `${request.engine} could not be started or read.`,
+    reason: "process",
+    stderr: "",
+  });
+};
+
 export const runProcess = Effect.fn("runProcess")(function* (
   request: ProcessRequest
 ) {
@@ -124,14 +158,6 @@ export const runProcess = Effect.fn("runProcess")(function* (
 
   return yield* execution.pipe(
     Effect.timeout(request.timeout ?? "2 minutes"),
-    Effect.mapError(
-      () =>
-        new AnalyzerFailure({
-          engine: request.engine,
-          exitCode: null,
-          message: `${request.engine} could not be started.`,
-          stderr: "",
-        })
-    )
+    Effect.mapError((error) => makeProcessFailure(request, error))
   );
 });

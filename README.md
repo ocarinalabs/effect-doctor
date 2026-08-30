@@ -85,7 +85,7 @@ const program: Effect.Effect<ScanReport, DoctorFailure> = scanProject({
 const report = await Effect.runPromise(program);
 ```
 
-`ProjectFailure`, `AnalyzerFailure`, and `InvalidAnalyzerOutput` are also exported for `_tag`-based handling. Do not import from `dist/*` or `src/*`.
+`ProjectFailure`, `AnalyzerFailure`, and `InvalidAnalyzerOutput` are also exported for `_tag`-based handling. `AnalyzerFailure.reason` distinguishes process, timeout, output-limit, exit, and toolchain failures. Do not import from `dist/*` or `src/*`.
 
 ## Report contract
 

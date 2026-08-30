@@ -79,10 +79,17 @@ const makeIntegrityConfig = (doctorPluginPath: string): string =>
   });
 
 export type OxlintAnalysis = {
-  readonly diagnostics: readonly OxlintDiagnostic[];
+  readonly diagnostics: readonly OxlintDiagnosticWithPass[];
 };
 
-type OxlintProcessAnalysis = OxlintAnalysis & {
+type OxlintPass = "primary" | "integrity";
+
+type OxlintDiagnosticWithPass = OxlintDiagnostic & {
+  readonly pass: OxlintPass;
+};
+
+type OxlintProcessAnalysis = {
+  readonly diagnostics: readonly OxlintDiagnostic[];
   readonly numberOfRules: number;
 };
 
@@ -184,6 +191,7 @@ const analyzeWithOxlint = Effect.fn("analyzeWithOxlint")(function* (
       engine,
       exitCode: result.exitCode,
       message: `Oxlint exited with code ${result.exitCode}`,
+      reason: "exit",
       stderr: "",
     });
   }
@@ -358,7 +366,16 @@ export const runOxlint = Effect.fn("runOxlint")(function* (
         sources
       );
       return {
-        diagnostics: [...primaryAnalysis.diagnostics, ...integrityDiagnostics],
+        diagnostics: [
+          ...primaryAnalysis.diagnostics.map((diagnostic) => ({
+            ...diagnostic,
+            pass: "primary" as const,
+          })),
+          ...integrityDiagnostics.map((diagnostic) => ({
+            ...diagnostic,
+            pass: "integrity" as const,
+          })),
+        ],
       } satisfies OxlintAnalysis;
     })
   );
@@ -387,10 +404,16 @@ const positionAtByteOffset = (
   if (Buffer.byteLength(prefix) !== offset) {
     return undefined;
   }
-  const lines = prefix.split(/\r?\n/u);
+  let line = 1;
+  for (const byte of source.subarray(0, offset)) {
+    if (byte === 0x0a) {
+      line += 1;
+    }
+  }
+  const lastNewline = source.subarray(0, offset).lastIndexOf(0x0a);
   return {
-    column: [...(lines.at(-1) ?? "")].length + 1,
-    line: lines.length,
+    column: offset - lastNewline,
+    line,
   };
 };
 
@@ -422,10 +445,10 @@ const endPosition = (
 ): { readonly line: number; readonly column: number } => {
   const lines = evidence.split(/\r?\n/u);
   if (lines.length === 1) {
-    return { column: column + [...evidence].length, line };
+    return { column: column + Buffer.byteLength(evidence), line };
   }
   return {
-    column: [...(lines.at(-1) ?? "")].length + 1,
+    column: Buffer.byteLength(lines.at(-1) ?? "") + 1,
     line: line + lines.length - 1,
   };
 };
@@ -447,7 +470,7 @@ const requireOxlintSource = Effect.fn("requireOxlintSource")(function* (
 });
 
 const requireOxlintRule = Effect.fn("requireOxlintRule")(function* (
-  diagnostic: OxlintDiagnostic
+  diagnostic: OxlintDiagnosticWithPass
 ) {
   const rule = ruleForDiagnostic(diagnostic.code);
   if (rule === undefined || rule.source === "effect-tsgo") {
@@ -459,6 +482,39 @@ const requireOxlintRule = Effect.fn("requireOxlintRule")(function* (
     });
   }
   return rule;
+});
+
+const configuredOxlintSeverity = (
+  rule: RuleCatalogEntry
+): "error" | "warn" | undefined => {
+  if (rule.source === "effect-oxlint") {
+    return effectOxlintRules[rule.providerRuleId];
+  }
+  return rule.execution === "oxlint-integrity"
+    ? integrityOxlintRules[rule.providerRuleId]
+    : doctorOxlintRules[rule.providerRuleId];
+};
+
+const validateOxlintPolicy = Effect.fn("validateOxlintPolicy")(function* (
+  diagnostic: OxlintDiagnosticWithPass,
+  rule: RuleCatalogEntry
+) {
+  const configuredSeverity = configuredOxlintSeverity(rule);
+  const expectedPass: OxlintPass =
+    rule.execution === "oxlint-integrity" ? "integrity" : "primary";
+  const expectedDiagnosticSeverity =
+    configuredSeverity === "error" ? "error" : "warning";
+  if (
+    !rule.defaultEnabled ||
+    configuredSeverity === undefined ||
+    diagnostic.pass !== expectedPass ||
+    diagnostic.severity !== expectedDiagnosticSeverity
+  ) {
+    return yield* new InvalidAnalyzerOutput({
+      engine: rule.source,
+      message: "Oxlint diagnostic does not match the configured rule policy.",
+    });
+  }
 });
 
 const supportsOxlintFileVersion = Effect.fn("supportsOxlintFileVersion")(
@@ -483,7 +539,7 @@ const supportsOxlintFileVersion = Effect.fn("supportsOxlintFileVersion")(
 );
 
 const makeOxlintFinding = Effect.fn("makeOxlintFinding")(function* (
-  diagnostic: OxlintDiagnostic,
+  diagnostic: OxlintDiagnosticWithPass,
   rule: RuleCatalogEntry,
   source: AnalyzedSource
 ) {
@@ -540,6 +596,7 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
         sources
       );
       const rule = yield* requireOxlintRule(diagnostic);
+      yield* validateOxlintPolicy(diagnostic, rule);
       const supported = yield* supportsOxlintFileVersion(
         root,
         path,

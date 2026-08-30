@@ -59,6 +59,7 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
       engine: "effect-tsgo",
       exitCode: result.exitCode,
       message: `Effect TSGo exited with code ${result.exitCode}`,
+      reason: "exit",
       stderr: "",
     });
   }
