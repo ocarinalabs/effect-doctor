@@ -198,7 +198,12 @@ try {
   assert(packed.name === manifest.name, "The tarball package name changed");
   assert(packed.version === manifest.version, "The tarball version changed");
   const packageFiles = packed.files.map((file) => file.path);
-  for (const requiredFile of ["LICENSE", "README.md"]) {
+  for (const requiredFile of [
+    "LICENSE",
+    "LICENSE.effect-tsgo",
+    "LICENSE.oxlint-plugins",
+    "README.md",
+  ]) {
     assert(
       packageFiles.includes(requiredFile),
       `The tarball does not include ${requiredFile}`

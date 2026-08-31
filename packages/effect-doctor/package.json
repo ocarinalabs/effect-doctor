@@ -21,6 +21,8 @@
   "files": [
     "dist",
     "LICENSE",
+    "LICENSE.effect-tsgo",
+    "LICENSE.oxlint-plugins",
     "README.md"
   ],
   "type": "module",

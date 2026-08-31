@@ -26,7 +26,8 @@
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
-    "LICENSE"
+    "LICENSE",
+    "LICENSE.oxlint-plugins"
   ],
   "type": "module",
   "sideEffects": false,

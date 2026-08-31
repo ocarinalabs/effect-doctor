@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
@@ -70,6 +71,9 @@ describe.sequential("the packed Oxlint plugin", () => {
       );
       expect(extracted.error).toBeUndefined();
       expect(extracted.status, extracted.stderr).toBe(0);
+      expect(
+        readFileSync(join(extractedPackage, "LICENSE.oxlint-plugins"), "utf-8")
+      ).toContain("Copyright (c) 2024-present VoidZero Inc. & Contributors");
 
       const plugin = join(extractedPackage, "dist", "index.js");
       const source = join(workspace, "source.ts");
