@@ -67,7 +67,7 @@ The recommended preset enables every `effect-doctor/*` rule as a warning.
 | Rule | What it catches |
 | --- | --- |
 | `consistent-effect-fn-name` | Unqualified `Effect.fn` span names that disagree with their assigned function |
-| `no-duplicate-layer-factory-call` | Repeated zero-argument Layer factories in one composition graph |
+| `no-duplicate-layer-factory-call` | The rule reports composition graphs that call the same zero-argument Layer factory more than once |
 | `no-inline-schema-compile` | Closed Schema parsers compiled repeatedly inside functions |
 | `no-long-lived-layer-acquisition` | Provably long-lived work blocking Layer acquisition |
 | `no-manual-sql-transaction` | Transaction-control statements sent manually through Effect SQL |

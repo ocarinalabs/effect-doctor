@@ -69,6 +69,8 @@ jobs:
           files: '["CONTEXT.md", "README.md", "CONTRIBUTING.md", "packages/effect-doctor/README.md", "packages/eslint-plugin-effect-doctor/README.md", "packages/oxlint-plugin-effect-doctor/README.md", "action/README.md", ".github/PULL_REQUEST_TEMPLATE.md"]'
           filter_mode: nofilter
           version: 3.17.1
+      - name: Keep Vale available to the repository prose gate
+        run: echo "$RUNNER_TOOL_CACHE/vale/3.17.1/x64" >> "$GITHUB_PATH"
       - run: bun run prose
 
   verify:
