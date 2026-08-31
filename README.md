@@ -51,7 +51,7 @@ steps:
   [
     { uses: actions/checkout@v5, with: { fetch-depth: 0 } },
     { run: npm ci },
-    { uses: ocarinalabs/effect-doctor@v1 },
+    { uses: ocarinalabs/effect-doctor@v0.1.0 },
   ]
 ```
 
