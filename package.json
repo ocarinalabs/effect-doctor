@@ -1,82 +1,48 @@
 {
-  "name": "@ocarinalabs/effect-doctor",
-  "version": "0.1.0",
-  "description": "Deterministic Effect TypeScript diagnostics for humans and coding-agent evaluations.",
-  "keywords": [
-    "effect",
-    "effect-ts",
-    "lint",
-    "static-analysis",
-    "typescript"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ocarinalabs/effect-doctor.git"
-  },
-  "bin": {
-    "effect-doctor": "dist/bin.js"
-  },
-  "files": [
-    "CHANGELOG.md",
-    "CODE_OF_CONDUCT.md",
-    "CONTRIBUTING.md",
-    "dist",
-    "docs/architecture.md",
-    "docs/README.md",
-    "docs/release.md",
-    "docs/research/README.md",
-    "LICENSE",
-    "README.md",
-    "SECURITY.md",
-    "SUPPORT.md",
-    "THIRD_PARTY_NOTICES.md"
+  "name": "effect-doctor-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
   ],
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
   "scripts": {
-    "audit": "fallow --fail-on-issues --threads 4",
-    "audit:dependencies": "bun audit --audit-level=high",
-    "bench": "bun run build && node scripts/benchmark.mjs",
-    "catalog:check": "node scripts/rule-catalog.mjs",
-    "catalog:generate": "node scripts/rule-catalog.mjs --write",
-    "build": "node scripts/build.mjs",
-    "check": "bun run catalog:check && bun run lint && bun run typecheck && bun run test",
-    "doctor:self": "bun run build && node dist/bin.js . --format json",
-    "fix": "ultracite fix",
-    "lint": "ultracite check",
-    "prepack": "bun run catalog:check && bun run build",
-    "setup:effect": "effect-tsgo patch --typescript --no-oxlint",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "verify:package": "node scripts/verify-package.mjs",
-    "verify:release": "bun run audit:dependencies && bun run check && bun run audit && bun run doctor:self && bun run verify:package && npm pack --dry-run"
-  },
-  "dependencies": {
-    "@effect/platform-node": "4.0.0-rc.112",
-    "@effect/tsgo": "0.38.0",
-    "@oxlint/plugins": "1.80.0",
-    "effect": "4.0.0-rc.112",
-    "oxlint": "1.80.0",
-    "oxlint-plugin-effect": "0.11.0",
-    "typescript": "7.0.2"
+    "audit": "turbo run //#audit:dupes:repo //#audit:health:repo",
+    "audit:dependencies": "turbo run //#audit:dependencies:repo",
+    "bench": "turbo run bench --filter=@ocarinalabs/effect-doctor",
+    "build": "turbo run build",
+    "catalog:check": "turbo run catalog:check --filter=@effect-doctor/core",
+    "catalog:generate": "turbo run catalog:generate --filter=@effect-doctor/core",
+    "check": "turbo run catalog:check typecheck test //#lint:repo //#test:action:repo",
+    "doctor:self": "turbo run doctor:self --filter=@ocarinalabs/effect-doctor",
+    "fix": "turbo run //#fix:repo",
+    "lint": "turbo run //#lint:repo",
+    "prose": "bun tooling/prose.ts",
+    "prose:sync": "vale sync",
+    "setup:effect": "turbo run setup:effect --filter=@effect-doctor/api",
+    "test": "turbo run test",
+    "test:action": "turbo run //#test:action:repo",
+    "test:watch": "turbo run test:watch",
+    "typecheck": "turbo run typecheck",
+    "verify:package": "turbo run verify:package",
+    "verify:release": "turbo run verify:release",
+    "audit:dupes:repo": "fallow dupes --no-cache --fail-on-issues --summary --threads 4",
+    "audit:health:repo": "fallow health --max-crap 1000 --no-cache --fail-on-issues --summary --threads 4",
+    "audit:dependencies:repo": "bun audit --audit-level=high",
+    "fix:repo": "ultracite fix",
+    "lint:repo": "ultracite check",
+    "test:action:repo": "node --test action/tests/*.test.mjs"
   },
   "devDependencies": {
     "@types/node": "26.4.0",
     "fallow": "3.20.0",
     "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
+    "oxlint-plugin-effect": "0.11.0",
+    "slopsift": "0.11.0",
+    "turbo": "2.10.12",
+    "typescript": "7.0.2",
     "ultracite": "7.10.7",
+    "vite-plus": "0.3.0",
     "vitest": "4.1.11"
   },
   "engines": {

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "catalog:check": {},
+    "catalog:generate": {
+      "cache": false
+    },
+    "typecheck": {
+      "dependsOn": ["^build", "^typecheck"]
+    },
+    "test": {
+      "dependsOn": ["build", "^test"]
+    },
+    "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "setup:effect": {
+      "cache": false
+    },
+    "bench": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "doctor:self": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "verify:package": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
+    "verify:release": {
+      "dependsOn": [
+        "build",
+        "test",
+        "typecheck",
+        "verify:package",
+        "doctor:self",
+        "^catalog:check",
+        "//#audit:dependencies:repo",
+        "//#audit:dupes:repo",
+        "//#audit:health:repo",
+        "//#lint:repo",
+        "//#test:action:repo"
+      ],
+      "cache": false
+    },
+    "//#audit:dependencies:repo": {
+      "cache": false
+    },
+    "//#audit:dupes:repo": {
+      "cache": false
+    },
+    "//#audit:health:repo": {
+      "cache": false
+    },
+    "//#fix:repo": {
+      "cache": false
+    },
+    "//#lint:repo": {},
+    "//#test:action:repo": {}
+  }
+}

@@ -1,0 +1,7 @@
+APIs
+ESLint
+lockfile
+npm
+Oxlint
+TSGo
+worktree

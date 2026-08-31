@@ -13,6 +13,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  action:
+    name: GitHub Action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate Action metadata
+        run: >-
+          docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.x
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0
+      - run: bun install --frozen-lockfile
+      - run: bun run setup:effect
+      - run: bun run build
+      - run: bun run test:action
+      - name: Run the local Action
+        uses: ./
+        with:
+          blocking: none
+          comment: "false"
+          commit-status: "false"
+          review-comments: "false"
+          scope: full
+          version: file:${{ github.workspace }}/packages/effect-doctor
+
+  prose:
+    name: Prose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.18.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.4.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install sloplint==0.8.0 slopscore-lint==0.9.1
+      - run: bun install --frozen-lockfile
+      - uses: vale-cli/vale-action@518a9136acc6e6668ce7c00d367051e0941e87ff # v3
+        with:
+          fail_level: any
+          files: '["CONTEXT.md", "README.md", "CONTRIBUTING.md", "packages/effect-doctor/README.md", "packages/eslint-plugin-effect-doctor/README.md", "packages/oxlint-plugin-effect-doctor/README.md", "action/README.md", ".github/PULL_REQUEST_TEMPLATE.md"]'
+          filter_mode: nofilter
+          version: 3.17.1
+      - name: Keep Vale available to the repository prose gate
+        run: echo "$RUNNER_TOOL_CACHE/vale/3.17.1/x64" >> "$GITHUB_PATH"
+      - run: bun run prose
+
   verify:
     name: Verify (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -34,7 +94,7 @@ jobs:
       - run: bun run setup:effect
       - run: bun run audit:dependencies
       - run: bun run check
-      - run: bun run audit
       - run: bun run doctor:self
       - run: bun run verify:package
       - run: npm pack --dry-run
+        working-directory: packages/effect-doctor

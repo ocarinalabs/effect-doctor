@@ -1,0 +1,64 @@
+{
+  "name": "eslint-plugin-effect-doctor",
+  "version": "0.1.0",
+  "description": "Effect Doctor rules for ESLint.",
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "eslint",
+    "eslint-plugin",
+    "linter",
+    "static-analysis",
+    "typescript"
+  ],
+  "homepage": "https://github.com/ocarinalabs/effect-doctor#readme",
+  "bugs": {
+    "url": "https://github.com/ocarinalabs/effect-doctor/issues"
+  },
+  "license": "MIT",
+  "author": "Ocarina Labs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ocarinalabs/effect-doctor.git",
+    "directory": "packages/eslint-plugin-effect-doctor"
+  },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "LICENSE"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit",
+    "verify:package": "npm pack --dry-run",
+    "verify:release": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "oxlint-plugin-effect-doctor": "0.1.0"
+  },
+  "devDependencies": {
+    "eslint": "10.9.1"
+  },
+  "peerDependencies": {
+    "eslint": ">=9.0.0 <11.0.0"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

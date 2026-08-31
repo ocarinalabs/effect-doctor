@@ -1,0 +1,64 @@
+{
+  "name": "@ocarinalabs/effect-doctor",
+  "version": "0.1.0",
+  "description": "Deterministic Effect TypeScript diagnostics for humans and coding-agent evaluations.",
+  "keywords": [
+    "effect",
+    "effect-ts",
+    "lint",
+    "static-analysis",
+    "typescript"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ocarinalabs/effect-doctor.git",
+    "directory": "packages/effect-doctor"
+  },
+  "bin": {
+    "effect-doctor": "dist/bin.js"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "bench": "bun run build && node scripts/benchmark.mjs",
+    "build": "vp pack",
+    "doctor:self": "node dist/bin.js ../.. --format json --blocking never",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit",
+    "verify:package": "node scripts/verify-package.mjs",
+    "verify:release": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0-rc.112",
+    "@effect/tsgo": "0.38.0",
+    "@oxlint/plugins": "1.80.0",
+    "effect": "4.0.0-rc.112",
+    "oxlint": "1.80.0",
+    "oxlint-plugin-effect": "0.11.0",
+    "typescript": "7.0.2"
+  },
+  "devDependencies": {
+    "@effect-doctor/api": "workspace:*"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

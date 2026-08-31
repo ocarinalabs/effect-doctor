@@ -26,12 +26,34 @@ jobs:
         run: |
           node --input-type=module <<'NODE'
           import { readFileSync } from "node:fs";
-          const manifest = JSON.parse(readFileSync("package.json", "utf-8"));
+          const manifest = JSON.parse(
+            readFileSync("packages/effect-doctor/package.json", "utf-8")
+          );
+          const pluginManifest = JSON.parse(
+            readFileSync(
+              "packages/oxlint-plugin-effect-doctor/package.json",
+              "utf-8"
+            )
+          );
+          const eslintManifest = JSON.parse(
+            readFileSync(
+              "packages/eslint-plugin-effect-doctor/package.json",
+              "utf-8"
+            )
+          );
           const expected = `v${manifest.version}`;
           if (
             process.env.RELEASE_TAG !== expected ||
             manifest.name !== "@ocarinalabs/effect-doctor" ||
-            manifest.private === true
+            manifest.private === true ||
+            pluginManifest.name !== "oxlint-plugin-effect-doctor" ||
+            pluginManifest.private === true ||
+            pluginManifest.version !== manifest.version ||
+            eslintManifest.name !== "eslint-plugin-effect-doctor" ||
+            eslintManifest.private === true ||
+            eslintManifest.version !== manifest.version ||
+            eslintManifest.dependencies?.["oxlint-plugin-effect-doctor"] !==
+              manifest.version
           ) {
             throw new Error(`Release metadata does not match ${expected}`);
           }
@@ -42,6 +64,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24.x
+          package-manager-cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: 1.4.0
@@ -50,9 +73,36 @@ jobs:
       - run: bun run setup:effect
       - run: bun run audit:dependencies
       - run: bun run check
-      - run: bun run audit
       - run: bun run doctor:self
-      - run: node scripts/verify-package.mjs --release-directory "$RUNNER_TEMP/release"
+      - run: node packages/effect-doctor/scripts/verify-package.mjs --release-directory "$RUNNER_TEMP/release"
+      - name: Pack Oxlint plugin
+        run: |
+          npm pack ./packages/oxlint-plugin-effect-doctor --pack-destination "$RUNNER_TEMP/release"
+          cd "$RUNNER_TEMP/release"
+          sha256sum oxlint-plugin-effect-doctor-*.tgz >> SHA256SUMS
+      - name: Pack ESLint plugin
+        run: |
+          npm pack ./packages/eslint-plugin-effect-doctor --pack-destination "$RUNNER_TEMP/release"
+          cd "$RUNNER_TEMP/release"
+          sha256sum eslint-plugin-effect-doctor-*.tgz >> SHA256SUMS
+      - name: Verify plugin artifacts
+        run: |
+          mkdir "$RUNNER_TEMP/plugin-consumer"
+          cd "$RUNNER_TEMP/plugin-consumer"
+          npm init --yes
+          npm install --ignore-scripts --no-audit --no-fund --package-lock=false \
+            eslint@10.9.1 \
+            "$RUNNER_TEMP"/release/oxlint-plugin-effect-doctor-*.tgz \
+            "$RUNNER_TEMP"/release/eslint-plugin-effect-doctor-*.tgz
+          node --input-type=module <<'NODE'
+          import effectDoctor from "eslint-plugin-effect-doctor";
+          if (
+            Object.keys(effectDoctor.rules).length !== 15 ||
+            effectDoctor.configs.recommended.plugins["effect-doctor"] !== effectDoctor
+          ) {
+            throw new Error("The packed ESLint plugin contract is incomplete");
+          }
+          NODE
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: npm-package
@@ -81,6 +131,10 @@ jobs:
           name: npm-package
           path: release
       - run: sha256sum --check SHA256SUMS
+        working-directory: release
+      - run: npm publish oxlint-plugin-effect-doctor-*.tgz --access public
+        working-directory: release
+      - run: npm publish eslint-plugin-effect-doctor-*.tgz --access public
         working-directory: release
       - run: npm publish package.tgz --access public
         working-directory: release

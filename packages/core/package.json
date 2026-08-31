@@ -1,0 +1,36 @@
+{
+  "name": "@effect-doctor/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic report primitives and invariants for Effect Doctor.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "bun run catalog:check && vp pack",
+    "catalog:check": "node scripts/rule-catalog.mjs",
+    "catalog:generate": "node scripts/rule-catalog.mjs --write",
+    "test": "vp test run",
+    "test:watch": "vp test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "4.0.0-rc.112"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "0.38.0",
+    "@oxlint/plugins": "1.80.0",
+    "oxlint": "1.80.0",
+    "oxlint-plugin-effect": "0.11.0",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}
