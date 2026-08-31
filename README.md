@@ -28,11 +28,13 @@ npx @ocarinalabs/effect-doctor@latest rules explain effect/floating-effect
 
 ## Checks
 
-Each scan runs 150 active rules. Rules do not silently switch off:
+Each scan configures 150 active rules:
 
 - 94 `Effect TSGo` rules find type errors and unsafe Effect code.
 - 40 `Effect Oxlint` rules find bad local patterns.
 - 16 Effect Doctor rules check cancellation, resource life spans, SQL, Schema, and safe Findings.
+
+The policy has two fixed groups. 114 rules can produce Findings in any file. 36 broad rules need a parsed, direct Effect import. Reports include the policy digest, file profiles, and counts for diagnostics that did not apply.
 
 All analyzers read the same files. The scan stops if a file changes or an analyzer fails. Errors can block a run. Advice stays visible but does not block the default CI job.
 
@@ -57,7 +59,7 @@ The Action adds a job summary, notes on code, one pull request comment, and a co
 
 ## Other integrations
 
-Choose the [`Oxlint` package](packages/oxlint-plugin-effect-doctor) for Oxlint or the [`ESLint` package](packages/eslint-plugin-effect-doctor) for an ESLint flat configuration. Both packages contain the 15 first-party rules.
+Choose the [`Oxlint` package](packages/oxlint-plugin-effect-doctor) for Oxlint or the [`ESLint` package](packages/eslint-plugin-effect-doctor) for an ESLint flat configuration. Both packages contain the 15 first-party rules. The public [agent skill](skills/effect-doctor) gives coding agents the same scan and comparison workflow.
 
 ## CLI in CI
 

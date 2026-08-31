@@ -49,7 +49,9 @@ npx @ocarinalabs/effect-doctor@latest rules explain effect/floating-effect
 - 40 `Effect Oxlint` rules find unsafe local patterns.
 - 16 Effect Doctor rules check resource lifetime, cancellation, SQL, Schema, and safe Findings.
 
-All 150 Effect v4 rules run. Effect Doctor returns an empty report only after every analyzer completes against the same immutable source snapshot. Incomplete or inconsistent analysis fails closed.
+To cover Effect v4, each scan configures 150 rules. The policy lets 114 rules produce Findings in any file. 36 broad rules need a parsed, direct Effect import. Reports include the policy digest, file profiles, and counts for diagnostics that did not apply.
+
+Effect Doctor returns an empty report only after every analyzer completes against the same immutable source snapshot. Incomplete or inconsistent analysis fails closed.
 
 ## CI
 
