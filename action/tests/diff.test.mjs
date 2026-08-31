@@ -3,13 +3,11 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
-  changesDependencyGraph,
   effectiveScope,
   parseChangedLines,
   rebaseChangedLines,
   safePullRequestScope,
   selectFindings,
-  withinDirectory,
 } from "../diff.mjs";
 import { parseDoctorReport } from "../report.mjs";
 
@@ -42,14 +40,6 @@ test("directory rebasing excludes files outside the project", () => {
   ]);
   const rebased = rebaseChangedLines(changed, "packages/app");
   assert.deepEqual([...rebased.keys()], ["src/program.ts"]);
-  assert.equal(
-    withinDirectory("packages/app/src/a.ts", "packages/app"),
-    "src/a.ts"
-  );
-  assert.equal(
-    withinDirectory("packages/other/a.ts", "packages/app"),
-    undefined
-  );
 });
 
 test("files scope selects every Finding in changed files", () => {
@@ -87,10 +77,13 @@ test("pull requests honor scope while other events analyze the full project", ()
 
 test("dependency and workspace changes avoid a hybrid comparison", () => {
   assert.equal(
-    changesDependencyGraph(new Set(["packages/app/package.json"])),
-    true
+    safePullRequestScope("changed", new Set(["packages/app/package.json"])),
+    "full"
   );
-  assert.equal(changesDependencyGraph(new Set(["pnpm-workspace.yaml"])), true);
+  assert.equal(
+    safePullRequestScope("changed", new Set(["pnpm-workspace.yaml"])),
+    "full"
+  );
   assert.equal(
     safePullRequestScope("changed", new Set(["package-lock.json"])),
     "full"

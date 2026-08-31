@@ -127,7 +127,7 @@ const dependencyFiles = new Set([
   "yarn.lock",
 ]);
 
-export const changesDependencyGraph = (repositoryFiles) =>
+const changesDependencyGraph = (repositoryFiles) =>
   [...repositoryFiles].some((file) => {
     const name = file.split("/").at(-1);
     return name === "package.json" || dependencyFiles.has(name);

@@ -43,7 +43,7 @@ export const parseDoctorReport = (source) => {
   for (const finding of [...findings, ...resolved]) {
     assertFinding(finding);
   }
-  return { findings, isComparison, report, resolved };
+  return { findings, report, resolved };
 };
 
 export const metricsFor = (findings, resolved = []) => {
@@ -173,7 +173,7 @@ const escapeCommandProperty = (value) =>
 export const messageCommand = (level, message) =>
   `::${level}::${escapeCommandData(message)}`;
 
-export const repositoryPath = (directory, file, workspace) => {
+const repositoryPath = (directory, file, workspace) => {
   const absolute = path.resolve(workspace, directory, file);
   const relative = path.relative(workspace, absolute);
   if (relative === "" || relative.startsWith(`..${path.sep}`)) {

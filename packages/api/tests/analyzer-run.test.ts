@@ -30,14 +30,6 @@ const snapshot = {
   tsconfig: join(projectRoot, "tsconfig.json"),
 } satisfies ProjectSnapshot;
 
-const v4Files = [
-  {
-    detectedEffect: "v4",
-    file: sourceFile,
-    supportedEffect: "v4",
-  },
-] as const;
-
 describe("Analyzer Run completeness", () => {
   it("rejects a first-party Analyzer Run with missing file canaries", async () => {
     await expect(
@@ -88,8 +80,7 @@ describe("Analyzer Run completeness", () => {
           },
         ],
       },
-      snapshot.files,
-      v4Files
+      snapshot.files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).rejects.toMatchObject({
@@ -117,8 +108,7 @@ describe("Analyzer Run completeness", () => {
           },
         ],
       },
-      snapshot.files,
-      v4Files
+      snapshot.files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).rejects.toMatchObject({
@@ -146,48 +136,12 @@ describe("Analyzer Run completeness", () => {
           },
         ],
       },
-      snapshot.files,
-      v4Files
+      snapshot.files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).rejects.toMatchObject({
       _tag: "InvalidAnalyzerOutput",
       engine: "effect-oxlint",
-    });
-  });
-
-  it("rejects Effect v3 file inventory before normalizing Oxlint", async () => {
-    const effect = normalizeOxlintFindings(
-      projectRoot,
-      {
-        diagnostics: [
-          {
-            code: "effect-doctor(consistent-effect-fn-name)",
-            filename: sourceFile,
-            labels: [
-              {
-                span: { column: 1, length: 6, line: 1, offset: 0 },
-              },
-            ],
-            message: "Keep the Effect.fn name consistent.",
-            pass: "primary",
-            severity: "warning",
-          },
-        ],
-      },
-      snapshot.files,
-      [
-        {
-          detectedEffect: "v3",
-          file: sourceFile,
-          supportedEffect: "v3",
-        },
-      ]
-    ).pipe(Effect.provide(NodeServices.layer));
-
-    await expect(Effect.runPromise(effect)).rejects.toMatchObject({
-      _tag: "InvalidAnalyzerOutput",
-      engine: "effect-doctor",
     });
   });
 
@@ -228,8 +182,7 @@ describe("Analyzer Run completeness", () => {
           },
         ],
       },
-      unicodeSnapshot.files,
-      v4Files
+      unicodeSnapshot.files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).resolves.toMatchObject([
@@ -262,8 +215,7 @@ describe("Analyzer Run completeness", () => {
           },
         ],
       },
-      snapshot.files,
-      v4Files
+      snapshot.files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).resolves.toMatchObject([
@@ -293,8 +245,7 @@ describe("Analyzer Run completeness", () => {
           },
         ],
       },
-      snapshot.files,
-      v4Files
+      snapshot.files
     ).pipe(Effect.provide(NodeServices.layer));
 
     await expect(Effect.runPromise(effect)).rejects.toMatchObject({

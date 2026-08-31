@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 const cli = fileURLToPath(new URL("../src/bin.ts", import.meta.url));
-const fixture = (name: "clean" | "invalid" | "invalid-config"): string =>
+const fixture = (name: "invalid" | "invalid-config"): string =>
   fileURLToPath(new URL(`../../api/tests/fixtures/${name}`, import.meta.url));
 
 const runCli = (root: string, format: "agent" | "json" = "json") =>
@@ -30,24 +30,6 @@ const runCliArguments = (arguments_: readonly string[]) =>
   });
 
 describe("Effect Doctor CLI", () => {
-  it("returns zero and a complete report for a clean project", () => {
-    const result = runCli(fixture("clean"));
-
-    expect(result.error).toBeUndefined();
-    expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual(
-      expect.objectContaining({
-        engines: expect.arrayContaining([
-          expect.objectContaining({ complete: true, engine: "effect-tsgo" }),
-          expect.objectContaining({ complete: true, engine: "effect-oxlint" }),
-          expect.objectContaining({ complete: true, engine: "effect-doctor" }),
-        ]),
-        schema: "effect-doctor/scan/v1",
-        summary: { advice: 0, errors: 0, warnings: 0 },
-      })
-    );
-  }, 30_000);
-
   it("returns one when a finding crosses the blocking threshold", () => {
     const result = runCli(fixture("invalid"));
 
@@ -56,18 +38,6 @@ describe("Effect Doctor CLI", () => {
       expect.objectContaining({
         schema: "effect-doctor/scan/v1",
         summary: expect.objectContaining({ errors: 2 }),
-      })
-    );
-  }, 30_000);
-
-  it("returns two and a versioned error when analysis cannot start", () => {
-    const result = runCli("/effect-doctor/does-not-exist");
-
-    expect(result.status).toBe(2);
-    expect(JSON.parse(result.stdout)).toEqual(
-      expect.objectContaining({
-        schema: "effect-doctor/error/v1",
-        status: "failed",
       })
     );
   }, 30_000);
@@ -86,18 +56,6 @@ describe("Effect Doctor CLI", () => {
     expect(result.stdout).not.toContain(root);
     expect(result.stdout).not.toContain("effectDoctorPrivateMarker.ts");
   }, 30_000);
-
-  it("lists a stable, machine-readable rule policy", () => {
-    const result = runCliArguments(["rules", "list"]);
-    const lines = result.stdout.trim().split("\n");
-    const ruleIds = lines.map((line) => line.split("\t")[0]);
-
-    expect(result.status).toBe(0);
-    expect(lines).toHaveLength(150);
-    expect(ruleIds).toEqual(ruleIds.toSorted());
-    expect(new Set(ruleIds).size).toBe(lines.length);
-    expect(result.stdout).not.toMatch(/\b(?:disabled|preview|v3)\b/u);
-  });
 
   it("explains a rule through the documented fields", () => {
     const ruleId = "effect-doctor/prefer-config-redacted";

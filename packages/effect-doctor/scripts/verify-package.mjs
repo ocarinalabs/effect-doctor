@@ -381,6 +381,19 @@ try {
     .trim()
     .split("\n");
   assert(rules.length === 150, "The packaged rule catalog is incomplete");
+  const ruleIds = rules.map((line) => line.split("\t")[0]);
+  assert(
+    JSON.stringify(ruleIds) === JSON.stringify(ruleIds.toSorted()),
+    "The packaged rule catalog is not in canonical order"
+  );
+  assert(
+    new Set(ruleIds).size === ruleIds.length,
+    "The packaged rule catalog contains duplicate IDs"
+  );
+  assert(
+    !/\b(?:disabled|preview|v3)\b/u.test(rules.join("\n")),
+    "The packaged rule catalog exposes obsolete policy"
+  );
 
   const unknownRule = runResult({
     arguments: cliArguments(["rules", "explain", "effect-doctor/not-a-rule"]),

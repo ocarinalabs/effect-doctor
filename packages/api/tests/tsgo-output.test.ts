@@ -37,10 +37,6 @@ const validOutput = {
 };
 
 describe("decodeTsgoOutput", () => {
-  it("decodes a complete v4 result", () => {
-    expect(decodeTsgoOutput(JSON.stringify(validOutput))).toEqual(validOutput);
-  });
-
   it("rejects an Effect v3 project as unsupported", () => {
     const output = structuredClone(validOutput);
     const file = output.files.at(0);

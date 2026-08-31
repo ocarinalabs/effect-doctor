@@ -130,8 +130,7 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
   const oxlintFindings = yield* normalizeOxlintFindings(
     root,
     oxlintAnalysis,
-    sources,
-    tsgoAnalysis.output.files
+    sources
   );
   const tsgoFindings = yield* normalizeTsgoFindings(tsgoAnalysis, sources);
   const findings = [...tsgoFindings, ...oxlintFindings].sort(

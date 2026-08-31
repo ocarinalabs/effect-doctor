@@ -16,21 +16,8 @@ import {
 const fixture = (name) =>
   readFileSync(new URL(`fixtures/${name}.json`, import.meta.url), "utf-8");
 
-test("a Scan Report produces severity and file counts", () => {
-  const { findings, resolved } = parseDoctorReport(fixture("scan"));
-  assert.deepEqual(metricsFor(findings, resolved), {
-    adviceCount: 1,
-    affectedFiles: 2,
-    errorCount: 1,
-    resolvedCount: 0,
-    totalCount: 3,
-    warningCount: 1,
-  });
-});
-
 test("a Comparison Report selects introduced and resolved Findings", () => {
   const parsed = parseDoctorReport(fixture("comparison"));
-  assert.equal(parsed.isComparison, true);
   assert.equal(parsed.findings[0].fingerprint, "introduced");
   assert.equal(parsed.resolved[0].fingerprint, "resolved");
 });

@@ -27,13 +27,11 @@ const OxlintOutputWire = Schema.Struct({
   diagnostics: Schema.Array(OxlintDiagnosticSchema),
   number_of_files: Schema.Natural,
   number_of_rules: Schema.Natural,
-  start_time: Schema.Finite,
-  threads_count: Schema.Natural,
 });
 
 const makeOxlintOutputSchema = (
   plannedFileCount: number,
-  plannedRuleCount?: number
+  plannedRuleCount: number
 ) =>
   OxlintOutputWire.check(
     Schema.makeFilter((output) => {
@@ -43,10 +41,7 @@ const makeOxlintOutputSchema = (
           `Oxlint number_of_files must equal planned file count ${plannedFileCount}`
         );
       }
-      if (
-        plannedRuleCount !== undefined &&
-        output.number_of_rules !== plannedRuleCount
-      ) {
+      if (output.number_of_rules !== plannedRuleCount) {
         issues.push(
           `Oxlint number_of_rules must equal planned rule count ${plannedRuleCount}`
         );
@@ -61,7 +56,7 @@ export type OxlintDiagnostic = typeof OxlintDiagnosticSchema.Type;
 export const decodeOxlintOutput = (
   input: string,
   plannedFileCount: number,
-  plannedRuleCount?: number
+  plannedRuleCount: number
 ): OxlintOutput => {
   const JsonSchema = Schema.fromJsonString(
     makeOxlintOutputSchema(plannedFileCount, plannedRuleCount)

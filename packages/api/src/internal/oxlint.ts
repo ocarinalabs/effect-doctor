@@ -28,7 +28,6 @@ import type { OxlintDiagnostic } from "./oxlint-output.js";
 import { runProcess } from "./process.js";
 import { INTEGRITY_VISIT_MESSAGE } from "./rules/diagnostic-suppression-contract.js";
 import type { ToolchainPaths } from "./toolchain.js";
-import type { TsgoFile } from "./tsgo-output.js";
 import type { AnalyzedSource } from "./tsgo.js";
 
 const CONFIG_CATEGORIES = {
@@ -518,28 +517,6 @@ const validateOxlintPolicy = Effect.fn("validateOxlintPolicy")(function* (
   }
 });
 
-const requireV4OxlintFile = Effect.fn("requireV4OxlintFile")(function* (
-  root: string,
-  path: Path.Path,
-  rule: RuleCatalogEntry,
-  source: AnalyzedSource,
-  fileVersions: readonly TsgoFile[]
-) {
-  const fileVersion = fileVersions.find(
-    (file) => path.resolve(root, file.file) === source.absolute
-  );
-  if (
-    fileVersion === undefined ||
-    fileVersion.detectedEffect !== "v4" ||
-    fileVersion.supportedEffect !== "v4"
-  ) {
-    return yield* new InvalidAnalyzerOutput({
-      engine: rule.source,
-      message: "Oxlint diagnostic requires an Effect v4 file inventory.",
-    });
-  }
-});
-
 const makeOxlintFinding = Effect.fn("makeOxlintFinding")(function* (
   diagnostic: OxlintDiagnosticWithPass,
   rule: RuleCatalogEntry,
@@ -581,8 +558,7 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
   function* (
     root: string,
     analysis: OxlintAnalysis,
-    sources: readonly AnalyzedSource[],
-    fileVersions: readonly TsgoFile[]
+    sources: readonly AnalyzedSource[]
   ) {
     const path = yield* Path.Path;
     const findings: Finding[] = [];
@@ -599,7 +575,6 @@ export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
       );
       const rule = yield* requireOxlintRule(diagnostic);
       yield* validateOxlintPolicy(diagnostic, rule);
-      yield* requireV4OxlintFile(root, path, rule, source, fileVersions);
       findings.push(yield* makeOxlintFinding(diagnostic, rule, source));
     }
 

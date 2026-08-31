@@ -74,7 +74,7 @@ const publishComment = async ({ core, context, github, result }) => {
 const pullRequestPath = (prefix, file) =>
   prefix === "." ? file : `${prefix}/${file}`;
 
-export const inlineReviewComments = (result, maximum = 25) => {
+const inlineReviewComments = (result, maximum = 25) => {
   const comments = [];
   const marker = reviewMarker(result.repositoryPrefix ?? result.directory);
   for (const finding of result.findings) {

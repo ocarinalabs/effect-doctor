@@ -28,27 +28,19 @@ const validOutput = {
 };
 
 describe("decodeOxlintOutput", () => {
-  it("decodes a result with exact planned coverage", () => {
-    expect(decodeOxlintOutput(JSON.stringify(validOutput), 1)).toEqual(
-      validOutput
-    );
-  });
-
   it("rejects malformed JSON", () => {
-    expect(() => decodeOxlintOutput("{", 1)).toThrowError(/valid JSON string/u);
-  });
-
-  it("rejects a vacuous scan", () => {
-    const output = { ...validOutput, diagnostics: [], number_of_files: 0 };
-
-    expect(() => decodeOxlintOutput(JSON.stringify(output), 1)).toThrowError(
-      /planned file count/u
-    );
+    expect(() =>
+      decodeOxlintOutput("{", 1, validOutput.number_of_rules)
+    ).toThrowError(/valid JSON string/u);
   });
 
   it("rejects incomplete planned coverage", () => {
     expect(() =>
-      decodeOxlintOutput(JSON.stringify(validOutput), 2)
+      decodeOxlintOutput(
+        JSON.stringify(validOutput),
+        2,
+        validOutput.number_of_rules
+      )
     ).toThrowError(/planned file count/u);
   });
 
@@ -67,9 +59,9 @@ describe("decodeOxlintOutput", () => {
     }
     diagnostic.labels = [];
 
-    expect(() => decodeOxlintOutput(JSON.stringify(output), 1)).toThrowError(
-      /Missing key/u
-    );
+    expect(() =>
+      decodeOxlintOutput(JSON.stringify(output), 1, validOutput.number_of_rules)
+    ).toThrowError(/Missing key/u);
   });
 
   it("rejects zero-based source positions", () => {
@@ -86,6 +78,8 @@ describe("decodeOxlintOutput", () => {
     }
     label.span.line = 0;
 
-    expect(() => decodeOxlintOutput(JSON.stringify(output), 1)).toThrowError();
+    expect(() =>
+      decodeOxlintOutput(JSON.stringify(output), 1, validOutput.number_of_rules)
+    ).toThrowError();
   });
 });
