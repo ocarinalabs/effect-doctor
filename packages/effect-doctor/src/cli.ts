@@ -4,6 +4,7 @@ import { Console, Effect } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 
 import { setExitCode } from "./internal/exit-code.js";
+import { posixArgument } from "./internal/posix-argument.js";
 import { isBlocked, renderComparison, renderScan } from "./render.js";
 import type { OutputFormat } from "./render.js";
 
@@ -21,14 +22,33 @@ const blockingFlag = Flag.choice("blocking", [
   Flag.withDefault("error")
 );
 
-const failureMessage = (failure: DoctorFailure): string => {
+const projectFlag = Flag.string("project").pipe(
+  Flag.withDescription("Root-relative TypeScript project configuration"),
+  Flag.withDefault("tsconfig.json")
+);
+
+const safeFailure = (failure: DoctorFailure) => {
   if (failure._tag === "ProjectFailure") {
-    return "Project configuration could not be analyzed.";
+    return {
+      code: failure.code,
+      message: failure.message,
+      tag: failure._tag,
+    };
   }
   if (failure._tag === "AnalyzerFailure") {
-    return `${failure.engine} could not complete analysis.`;
+    return {
+      engine: failure.engine,
+      exitCode: failure.exitCode,
+      message: failure.message,
+      reason: failure.reason,
+      tag: failure._tag,
+    };
   }
-  return `${failure.engine} returned invalid analysis output.`;
+  return {
+    engine: failure.engine,
+    message: failure.message,
+    tag: failure._tag,
+  };
 };
 
 const providerFix = (rule: RuleMetadata): string => {
@@ -44,14 +64,11 @@ const renderFailure = (
   failure: DoctorFailure,
   format: OutputFormat
 ): string => {
-  const message = failureMessage(failure);
+  const error = safeFailure(failure);
   if (format === "json") {
     return JSON.stringify(
       {
-        error: {
-          message,
-          tag: failure._tag,
-        },
+        error,
         schema: "effect-doctor/error/v1",
         status: "failed",
       },
@@ -59,7 +76,7 @@ const renderFailure = (
       2
     );
   }
-  return `Effect Doctor failed: ${message}`;
+  return `Effect Doctor failed: ${failure.message}`;
 };
 
 const scan = Command.make(
@@ -71,9 +88,15 @@ const scan = Command.make(
       Argument.withDefault(".")
     ),
     format: formatFlag,
+    project: projectFlag,
   },
-  Effect.fn("effectDoctor.scan")(function* ({ blocking, directory, format }) {
-    const report = yield* scanProject({ root: directory }).pipe(
+  Effect.fn("effectDoctor.scan")(function* ({
+    blocking,
+    directory,
+    format,
+    project,
+  }) {
+    const report = yield* scanProject({ project, root: directory }).pipe(
       Effect.catch((error) =>
         Effect.gen(function* () {
           yield* Console.log(renderFailure(error, format));
@@ -86,7 +109,7 @@ const scan = Command.make(
       return;
     }
 
-    const rerunCommand = `effect-doctor ${JSON.stringify(directory)} --format agent --blocking never`;
+    const rerunCommand = `effect-doctor ${posixArgument(directory)} --project=${posixArgument(report.target.entry)} --format agent --blocking never`;
     yield* Console.log(renderScan(report, format, rerunCommand));
     if (isBlocked(report.findings, blocking)) {
       yield* setExitCode(1);
@@ -101,16 +124,19 @@ const compare = Command.make(
     blocking: blockingFlag,
     candidate: Argument.directory("candidate"),
     format: formatFlag,
+    project: projectFlag,
   },
   Effect.fn("effectDoctor.compare")(function* ({
     baseline,
     blocking,
     candidate,
     format,
+    project,
   }) {
     const report = yield* compareProjects({
       baselineRoot: baseline,
       candidateRoot: candidate,
+      project,
     }).pipe(
       Effect.catch((error) =>
         Effect.gen(function* () {
@@ -124,7 +150,7 @@ const compare = Command.make(
       return;
     }
 
-    const rerunCommand = `effect-doctor compare ${JSON.stringify(baseline)} ${JSON.stringify(candidate)} --format agent --blocking never`;
+    const rerunCommand = `effect-doctor compare ${posixArgument(baseline)} ${posixArgument(candidate)} --project=${posixArgument(report.candidate.target.entry)} --format agent --blocking never`;
     yield* Console.log(renderComparison(report, format, rerunCommand));
     if (isBlocked(report.introduced, blocking)) {
       yield* setExitCode(1);

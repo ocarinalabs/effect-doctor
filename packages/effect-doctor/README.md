@@ -1,15 +1,19 @@
 # Effect Doctor
 
-Compiling is only the first check. Effect Doctor catches Effect-specific mistakes that tests and general-purpose linters miss.
-
-It targets the Effect v4 release candidate. It reads local files without editing source or sending telemetry.
+Run Effect Doctor on local Effect v4 release-candidate code to catch mistakes that tests, compilers, and general-purpose linters miss. It does not edit source or send telemetry.
 
 ## Quick start
 
-Run an audit from the directory containing your root `tsconfig.json`:
+Run an audit from the project root. Effect Doctor selects `tsconfig.json` and follows its TypeScript project references:
 
 ```sh
 npx @ocarinalabs/effect-doctor@latest .
+```
+
+Select another root-relative project configuration with `--project`:
+
+```sh
+npx @ocarinalabs/effect-doctor@latest . --project packages/server/tsconfig.json
 ```
 
 Use Node.js 22.18 or newer and install the target project's dependencies before scanning.
@@ -29,7 +33,7 @@ npx @ocarinalabs/effect-doctor@latest . --format agent
 To compare a baseline checkout with a candidate:
 
 ```sh
-npx @ocarinalabs/effect-doctor@latest compare ../baseline . --format json
+npx @ocarinalabs/effect-doctor@latest compare ../baseline . --project tsconfig.json --format json
 ```
 
 To inspect the rule catalogue:
@@ -65,6 +69,7 @@ import { scanProject } from "@ocarinalabs/effect-doctor";
 
 const report = await Effect.runPromise(
   scanProject({
+    project: "packages/server/tsconfig.json",
     root: process.cwd(),
   })
 );

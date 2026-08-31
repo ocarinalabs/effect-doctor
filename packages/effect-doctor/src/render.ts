@@ -5,6 +5,8 @@ import type {
   ScanReport,
 } from "@effect-doctor/api";
 
+import { posixArgument } from "./internal/posix-argument.js";
+
 export type OutputFormat = "pretty" | "json" | "agent";
 export type BlockingThreshold = "error" | "warning" | "never";
 
@@ -75,7 +77,8 @@ export const renderScan = (
     return renderAgentHandoff(
       report.findings,
       report.engines.map((run) => `${run.engine}@${run.version}`),
-      rerunCommand ?? "effect-doctor . --format agent --blocking never"
+      rerunCommand ??
+        `effect-doctor '.' --project=${posixArgument(report.target.entry)} --format agent --blocking never`
     );
   }
 
@@ -100,7 +103,7 @@ export const renderComparison = (
       report.introduced,
       report.candidate.engines.map((run) => `${run.engine}@${run.version}`),
       rerunCommand ??
-        "effect-doctor compare baseline candidate --format agent --blocking never"
+        `effect-doctor compare 'baseline' 'candidate' --project=${posixArgument(report.candidate.target.entry)} --format agent --blocking never`
     );
   }
 

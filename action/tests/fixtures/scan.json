@@ -2,6 +2,10 @@
   "schema": "effect-doctor/scan/v1",
   "kind": "scan",
   "doctorVersion": "0.1.0",
+  "target": {
+    "entry": "tsconfig.json",
+    "projects": ["tsconfig.json"]
+  },
   "findings": [
     {
       "category": "correctness",

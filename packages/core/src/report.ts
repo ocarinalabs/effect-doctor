@@ -5,11 +5,35 @@ import {
   AnalyzerRunSchema,
   FindingSchema,
   FindingSummarySchema,
+  ProjectRelativePathSchema,
 } from "./finding.js";
 import type { Finding, Severity } from "./finding.js";
 import { fingerprintFinding } from "./fingerprint.js";
 import { compareFindingOrder } from "./internal/finding-order.js";
 import { compareCodeUnits } from "./internal/order.js";
+
+const ScanTargetWire = Schema.Struct({
+  entry: ProjectRelativePathSchema,
+  projects: Schema.Array(ProjectRelativePathSchema),
+});
+
+const ScanTargetSchema = ScanTargetWire.check(
+  Schema.makeFilter((target) => {
+    if (
+      target.projects.length > 0 &&
+      new Set(target.projects).size === target.projects.length &&
+      isOrdered(target.projects, compareCodeUnits) &&
+      target.projects.includes(target.entry)
+    ) {
+      return [];
+    }
+    return [
+      "Scan target projects must be non-empty, unique, ordered, and contain the entry",
+    ];
+  })
+);
+
+export type ScanTarget = typeof ScanTargetSchema.Type;
 
 const ScanReportWire = Schema.Struct({
   doctorVersion: Schema.NonEmptyString,
@@ -19,6 +43,7 @@ const ScanReportWire = Schema.Struct({
   root: Schema.Literal("."),
   schema: Schema.Literal("effect-doctor/scan/v1"),
   summary: FindingSummarySchema,
+  target: ScanTargetSchema,
   toolchain: Schema.Struct({
     effect: Schema.NonEmptyString,
     effectOxlint: Schema.NonEmptyString,
@@ -186,6 +211,13 @@ const comparisonVersionIssues = (
   return ["Comparison and scan doctor versions must agree"];
 };
 
+const comparisonTargetIssues = (
+  report: ComparisonReportWire
+): Schema.FilterIssue[] =>
+  report.baseline.target.entry === report.candidate.target.entry
+    ? []
+    : ["Comparison scan targets must use the same entry project"];
+
 const comparisonDeltaIssues = (
   report: ComparisonReportWire
 ): Schema.FilterIssue[] => {
@@ -206,6 +238,7 @@ const comparisonDeltaIssues = (
 export const ComparisonReportSchema = ComparisonReportWire.check(
   Schema.makeFilter((report) => [
     ...comparisonVersionIssues(report),
+    ...comparisonTargetIssues(report),
     ...comparisonDeltaIssues(report),
   ])
 );

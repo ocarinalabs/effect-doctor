@@ -9,6 +9,7 @@ import { DOCTOR_VERSION } from "./version.js";
 export type CompareRequest = {
   readonly baselineRoot: string;
   readonly candidateRoot: string;
+  readonly project?: string;
 };
 
 export const compareProjects: (
@@ -16,10 +17,12 @@ export const compareProjects: (
 ) => Effect.Effect<ComparisonReport, DoctorFailure> = Effect.fn(
   "compareProjects"
 )(function* (request) {
+  const project =
+    request.project === undefined ? {} : { project: request.project };
   const [baseline, candidate] = yield* Effect.all(
     [
-      scanProject({ root: request.baselineRoot }),
-      scanProject({ root: request.candidateRoot }),
+      scanProject({ root: request.baselineRoot, ...project }),
+      scanProject({ root: request.candidateRoot, ...project }),
     ],
     { concurrency: 2 }
   );

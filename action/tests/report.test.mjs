@@ -22,6 +22,44 @@ test("a Comparison Report selects introduced and resolved Findings", () => {
   assert.equal(parsed.resolved[0].fingerprint, "resolved");
 });
 
+test("a Comparison Report cannot mix project targets", () => {
+  const report = JSON.parse(fixture("comparison"));
+  report.baseline.target = {
+    entry: "configs/other.json",
+    projects: ["configs/other.json"],
+  };
+
+  assert.throws(
+    () => parseDoctorReport(JSON.stringify(report)),
+    /different project targets/u
+  );
+});
+
+test("a project target must be unique and canonically ordered", () => {
+  for (const projects of [
+    ["tsconfig.json", "tsconfig.json"],
+    ["tsconfig.json", "packages/app/tsconfig.json"],
+  ]) {
+    const report = JSON.parse(fixture("scan"));
+    report.target.projects = projects;
+
+    assert.throws(
+      () => parseDoctorReport(JSON.stringify(report)),
+      /invalid project target/u
+    );
+  }
+});
+
+test("a Comparison Report validates the baseline project graph", () => {
+  const report = JSON.parse(fixture("comparison"));
+  report.baseline.target.projects = [];
+
+  assert.throws(
+    () => parseDoctorReport(JSON.stringify(report)),
+    /invalid project target/u
+  );
+});
+
 test("blocking policy ignores advice and respects its threshold", () => {
   const advice = metricsFor([
     parseDoctorReport(fixture("scan")).findings.find(
@@ -48,6 +86,7 @@ test("summary exposes Findings without inventing a score", () => {
     findings: parsed.findings,
     metrics,
     scope: "changed",
+    target: parsed.target,
   });
   assert.match(summary, /1 finding across 1 file/u);
   assert.match(summary, /effect-doctor\/no-run-sync-on-suspending-effect/u);
@@ -64,9 +103,14 @@ test("an incomplete summary preserves the Analyzer Run failure", () => {
     findings: [],
     metrics: metricsFor([]),
     scope: "full",
+    target: {
+      entry: "configs/effect.json",
+      projects: ["configs/effect.json"],
+    },
   });
   assert.match(summary, /Incomplete/u);
   assert.match(summary, /effect-tsgo timed out/u);
+  assert.match(summary, /configs\/effect\.json/u);
 });
 
 test("workflow annotations preserve locations and escape command payloads", () => {

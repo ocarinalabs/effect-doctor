@@ -27,6 +27,10 @@ const snapshot = {
     },
   ],
   root: projectRoot,
+  target: {
+    entry: "tsconfig.json",
+    projects: ["tsconfig.json"],
+  },
   tsconfig: join(projectRoot, "tsconfig.json"),
 } satisfies ProjectSnapshot;
 

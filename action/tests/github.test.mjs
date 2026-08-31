@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { publish } from "../github.mjs";
-import { metricsFor, parseDoctorReport, reviewMarker } from "../report.mjs";
+import {
+  commentMarker,
+  metricsFor,
+  parseDoctorReport,
+  reviewMarker,
+} from "../report.mjs";
 
 const parsed = parseDoctorReport(
   readFileSync(new URL("fixtures/scan.json", import.meta.url), "utf-8")
@@ -33,6 +38,10 @@ const makeResult = (overrides = {}) => ({
   repositoryPrefix: "packages/app",
   resolved: [],
   scope: "full",
+  target: {
+    entry: "tsconfig.json",
+    projects: ["tsconfig.json"],
+  },
   ...overrides,
 });
 
@@ -49,6 +58,10 @@ const withResultFile = async (result, use) => {
 
 const listReviewComments = () => {
   throw new Error("paginate must receive the review-comment endpoint");
+};
+
+const listIssueComments = () => {
+  throw new Error("paginate must receive the issue-comment endpoint");
 };
 
 const makeReviewClient = ({ previous = [] } = {}) => {
@@ -91,7 +104,7 @@ const publishReviews = (client, resultPath) =>
   });
 
 test("publish replaces stale reviews with comments on changed lines", async () => {
-  const marker = reviewMarker("packages/app");
+  const marker = reviewMarker("packages/app", "tsconfig.json");
   const client = makeReviewClient({
     previous: [
       { body: `${marker}\nold`, id: 11, user: { type: "Bot" } },
@@ -180,7 +193,7 @@ test("publish removes stale reviews when no finding is on a changed line", async
   const client = makeReviewClient({
     previous: [
       {
-        body: reviewMarker("packages/app"),
+        body: reviewMarker("packages/app", "tsconfig.json"),
         id: 21,
         user: { type: "Bot" },
       },
@@ -208,4 +221,135 @@ test("publish skips reviews for incomplete analysis", async () => {
 
   assert.deepEqual(client.events, []);
   assert.deepEqual(client.warnings, []);
+});
+
+test("publish isolates every GitHub surface by directory and target", async () => {
+  const events = [];
+  const warnings = [];
+  const targetEntry = "configs/effect.json";
+  const currentCommentMarker = commentMarker("packages/app", targetEntry);
+  const currentReviewMarker = reviewMarker("packages/app", targetEntry);
+  const otherCommentMarker = commentMarker(
+    "packages/app",
+    "configs/other.json"
+  );
+  const otherReviewMarker = reviewMarker("packages/app", "configs/other.json");
+  const github = {
+    paginate: (endpoint, request) => {
+      events.push({ kind: "list", request });
+      if (endpoint === listIssueComments) {
+        return [
+          {
+            body: otherCommentMarker,
+            id: 31,
+            user: { type: "Bot" },
+          },
+          {
+            body: currentCommentMarker,
+            id: 32,
+            user: { type: "Bot" },
+          },
+        ];
+      }
+      assert.equal(endpoint, listReviewComments);
+      return [
+        { body: otherReviewMarker, id: 41, user: { type: "Bot" } },
+        { body: currentReviewMarker, id: 42, user: { type: "Bot" } },
+      ];
+    },
+    rest: {
+      issues: {
+        createComment: (request) => events.push({ kind: "comment", request }),
+        listComments: listIssueComments,
+        updateComment: (request) =>
+          events.push({ kind: "update-comment", request }),
+      },
+      pulls: {
+        createReview: (request) => events.push({ kind: "review", request }),
+        deleteReviewComment: (request) =>
+          events.push({ kind: "delete-review", request }),
+        listReviewComments,
+      },
+      repos: {
+        createCommitStatus: (request) =>
+          events.push({ kind: "status", request }),
+      },
+    },
+  };
+  const result = makeResult({
+    target: {
+      entry: targetEntry,
+      projects: [targetEntry],
+    },
+  });
+
+  await withResultFile(result, (resultPath) =>
+    publish({
+      comment: "true",
+      commitStatus: "true",
+      core: { warning: (message) => warnings.push(message) },
+      context,
+      github,
+      resultPath,
+      reviewComments: "true",
+    })
+  );
+
+  const firstStatus = events.find((event) => event.kind === "status").request;
+  assert.match(
+    firstStatus.context,
+    /^Effect Doctor \(packages\/app\/configs\/effect\.json · [a-f0-9]{12}\)$/u
+  );
+
+  const comment = events.find(
+    (event) => event.kind === "update-comment"
+  ).request;
+  assert.equal(comment.comment_id, 32);
+  assert.match(comment.body, new RegExp(currentCommentMarker, "u"));
+  assert.match(comment.body, /packages\/app\/configs\/effect\.json/u);
+
+  const review = events.find((event) => event.kind === "review").request;
+  assert.match(review.comments[0].body, new RegExp(currentReviewMarker, "u"));
+  assert.deepEqual(
+    events
+      .filter((event) => event.kind === "delete-review")
+      .map((event) => event.request.comment_id),
+    [42]
+  );
+
+  await withResultFile(
+    makeResult({
+      directory: ".",
+      repositoryPrefix: ".",
+      target: {
+        entry: "packages/app/configs/effect.json",
+        projects: ["packages/app/configs/effect.json"],
+      },
+    }),
+    (resultPath) =>
+      publish({
+        comment: "false",
+        commitStatus: "true",
+        core: { warning: (message) => warnings.push(message) },
+        context,
+        github,
+        resultPath,
+        reviewComments: "false",
+      })
+  );
+
+  const statusContexts = events
+    .filter((event) => event.kind === "status")
+    .map((event) => event.request.context);
+  assert.equal(statusContexts.length, 2);
+  assert.equal(new Set(statusContexts).size, 2);
+  assert.equal(
+    statusContexts.every((value) =>
+      /^Effect Doctor \(packages\/app\/configs\/effect\.json · [a-f0-9]{12}\)$/u.test(
+        value
+      )
+    ),
+    true
+  );
+  assert.deepEqual(warnings, []);
 });

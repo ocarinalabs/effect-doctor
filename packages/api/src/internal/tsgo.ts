@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { dirname, resolve as resolvePath, win32 } from "node:path";
 
 import {
@@ -96,6 +97,7 @@ export const validateTsgoFiles = Effect.fn("validateTsgoFiles")(function* (
       Effect.mapError(
         () =>
           new ProjectFailure({
+            code: "coverage-mismatch",
             message: "Effect TSGo reported an unresolved project file.",
             root: snapshot.root,
           })
@@ -106,6 +108,7 @@ export const validateTsgoFiles = Effect.fn("validateTsgoFiles")(function* (
       .replaceAll("\\", "/");
     if (relative.startsWith("../") || path.isAbsolute(relative)) {
       return yield* new ProjectFailure({
+        code: "outside-root",
         message: "Effect TSGo reported a file outside the project root.",
         root: snapshot.root,
       });
@@ -133,10 +136,18 @@ const usesWindowsPathSemantics = (value: string): boolean =>
   /^[A-Za-z]:[\\/]/u.test(value) ||
   value.startsWith("\\\\");
 
-const providerPathIdentity = (value: string): string =>
-  usesWindowsPathSemantics(value)
-    ? win32.normalize(value).toLowerCase()
-    : resolvePath(value);
+const providerPathIdentity = (value: string): string => {
+  try {
+    const canonical = realpathSync(value);
+    return usesWindowsPathSemantics(canonical)
+      ? win32.normalize(canonical).toLowerCase()
+      : canonical;
+  } catch {
+    return usesWindowsPathSemantics(value)
+      ? win32.normalize(value).toLowerCase()
+      : resolvePath(value);
+  }
+};
 
 const sourceForDiagnostic = (
   diagnostic: TsgoDiagnostic,

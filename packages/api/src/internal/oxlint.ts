@@ -155,6 +155,7 @@ const writeTemporaryConfig = Effect.fn("writeTemporaryConfig")(function* (
     Effect.mapError(
       () =>
         new ProjectFailure({
+          code: "workspace-unavailable",
           message: "Unable to create an isolated Oxlint workspace",
           root,
         })
@@ -165,6 +166,7 @@ const writeTemporaryConfig = Effect.fn("writeTemporaryConfig")(function* (
     Effect.mapError(
       () =>
         new ProjectFailure({
+          code: "workspace-unavailable",
           message: "Unable to write the isolated Oxlint configuration",
           root,
         })
@@ -233,6 +235,7 @@ const writeIntegritySources = Effect.fn("writeIntegritySources")(function* (
       Effect.mapError(
         () =>
           new ProjectFailure({
+            code: "workspace-unavailable",
             message: "Unable to create an isolated Oxlint workspace",
             root,
           })
@@ -241,6 +244,7 @@ const writeIntegritySources = Effect.fn("writeIntegritySources")(function* (
     const masked = yield* Effect.try({
       catch: () =>
         new ProjectFailure({
+          code: "workspace-unavailable",
           message: "Unable to prepare suppression integrity analysis",
           root,
         }),
@@ -250,6 +254,7 @@ const writeIntegritySources = Effect.fn("writeIntegritySources")(function* (
       Effect.mapError(
         () =>
           new ProjectFailure({
+            code: "workspace-unavailable",
             message: "Unable to prepare suppression integrity analysis",
             root,
           })
@@ -306,6 +311,7 @@ const validateIntegrityAnalysis = Effect.fn("validateIntegrityAnalysis")(
       const original = originalByMirror.get(mirroredPath);
       if (original === undefined) {
         return yield* new ProjectFailure({
+          code: "coverage-mismatch",
           message: "Suppression integrity analysis reported an unplanned file.",
           root,
         });
@@ -463,6 +469,7 @@ const requireOxlintSource = Effect.fn("requireOxlintSource")(function* (
   const source = sourceForDiagnostic(root, path, diagnostic, sources);
   if (source === undefined) {
     return yield* new ProjectFailure({
+      code: "coverage-mismatch",
       message: "Oxlint reported a file outside the project snapshot.",
       root,
     });

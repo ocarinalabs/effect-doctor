@@ -38,6 +38,10 @@ const makeScanReport = (findings: readonly Finding[] = []): ScanReport => ({
     warnings: findings.filter((finding) => finding.severity === "warning")
       .length,
   },
+  target: {
+    entry: "tsconfig.json",
+    projects: ["tsconfig.json"],
+  },
   toolchain: {
     effect: "4.0.0-rc.112",
     effectOxlint: "0.11.0",
@@ -115,6 +119,18 @@ describe("ScanReportSchema", () => {
     expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
   });
 
+  it("rejects a target that omits its entry project", () => {
+    const report = {
+      ...makeScanReport(),
+      target: {
+        entry: "tsconfig.json",
+        projects: ["packages/app/tsconfig.json"],
+      },
+    };
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
+
   it("rejects a finding outside the provider inventory", () => {
     const report = makeScanReport([makeFinding({ file: "src/other.ts" })]);
 
@@ -159,6 +175,30 @@ describe("ComparisonReportSchema", () => {
       resolved: [],
       schema: "effect-doctor/comparison/v1",
       unchangedCount: 1,
+    } as const;
+
+    expect(() =>
+      Schema.decodeUnknownSync(ComparisonReportSchema)(report)
+    ).toThrow();
+  });
+
+  it("rejects different comparison entry projects", () => {
+    const baseline = makeScanReport();
+    const report = {
+      baseline,
+      candidate: {
+        ...makeScanReport(),
+        target: {
+          entry: "packages/app/tsconfig.json",
+          projects: ["packages/app/tsconfig.json"],
+        },
+      },
+      doctorVersion: "0.1.0",
+      introduced: [],
+      kind: "comparison",
+      resolved: [],
+      schema: "effect-doctor/comparison/v1",
+      unchangedCount: 0,
     } as const;
 
     expect(() =>

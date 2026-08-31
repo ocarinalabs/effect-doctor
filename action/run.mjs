@@ -335,6 +335,7 @@ const readActionRequest = () => ({
     "blocking"
   ),
   directoryInput: input("directory", "."),
+  projectInput: input("project", "tsconfig.json"),
   requestedScope: normalizeChoice(
     input("scope", "changed"),
     ["changed", "files", "lines", "full"],
@@ -344,7 +345,24 @@ const readActionRequest = () => ({
   version: input("version", "0.1.0"),
 });
 
-const resolveProject = (directoryInput) => {
+const projectEntry = (directory, projectInput) => {
+  if (path.isAbsolute(projectInput) || projectInput.includes("\\")) {
+    throw new Error("project must be a POSIX path relative to directory");
+  }
+  const project = path.resolve(directory, projectInput);
+  const relative = path.relative(directory, project);
+  if (
+    relative === "" ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error("project must name a file inside directory");
+  }
+  return relative.replaceAll(path.sep, "/");
+};
+
+const resolveProject = (directoryInput, projectInput) => {
   const requestedDirectory = path.resolve(workspace, directoryInput);
   const directory = existsSync(requestedDirectory)
     ? realpathSync(requestedDirectory)
@@ -359,6 +377,7 @@ const resolveProject = (directoryInput) => {
     directory,
     prefix: scanPrefix(repositoryRoot, directory),
     repositoryRoot,
+    targetEntry: projectEntry(directory, projectInput),
   };
 };
 
@@ -432,16 +451,37 @@ const analyzeProject = ({
   prefix,
   repositoryRoot,
   scope,
+  targetEntry,
 }) => {
   if (scope !== "changed") {
-    return runDoctor(executable, [directory]);
+    return {
+      reportSource: runDoctor(executable, [
+        directory,
+        `--project=${targetEntry}`,
+      ]),
+      scope,
+    };
   }
   const baseline = makeBaseline(repositoryRoot, directory, prefix, baseSha);
   try {
-    if (!existsSync(path.join(baseline.baseline, "tsconfig.json"))) {
-      return runDoctor(executable, [directory]);
+    if (!existsSync(path.join(baseline.baseline, targetEntry))) {
+      return {
+        reportSource: runDoctor(executable, [
+          directory,
+          `--project=${targetEntry}`,
+        ]),
+        scope: "full",
+      };
     }
-    return runDoctor(executable, ["compare", baseline.baseline, directory]);
+    return {
+      reportSource: runDoctor(executable, [
+        "compare",
+        baseline.baseline,
+        directory,
+        `--project=${targetEntry}`,
+      ]),
+      scope,
+    };
   } finally {
     baseline.cleanup();
   }
@@ -474,41 +514,74 @@ const completedResult = ({
     repositoryPrefix: prefix,
     resolved,
     scope: changes.scope,
+    target: parsed.target,
   };
 };
 
 const main = () => {
   const request = readActionRequest();
-  const project = resolveProject(request.directoryInput);
-  const baseSha = process.env.GITHUB_BASE_SHA;
-  const changes = resolveChanges({
-    baseSha,
-    eventName: process.env.GITHUB_EVENT_NAME,
-    prefix: project.prefix,
-    repositoryRoot: project.repositoryRoot,
-    requestedScope: request.requestedScope,
-    reviewComments: request.reviewComments,
-  });
-  const executable = installDoctor(request.version);
-  const reportSource = analyzeProject({
-    baseSha,
-    directory: project.directory,
-    executable,
-    prefix: project.prefix,
-    repositoryRoot: project.repositoryRoot,
-    scope: changes.scope,
-  });
-  const parsed = parseDoctorReport(reportSource);
-  emitResult(
-    completedResult({
+  const project = resolveProject(request.directoryInput, request.projectInput);
+  let result;
+  try {
+    const baseSha = process.env.GITHUB_BASE_SHA;
+    const changes = resolveChanges({
+      baseSha,
+      eventName: process.env.GITHUB_EVENT_NAME,
+      prefix: project.prefix,
+      repositoryRoot: project.repositoryRoot,
+      requestedScope: request.requestedScope,
+      reviewComments: request.reviewComments,
+    });
+    const executable = installDoctor(request.version);
+    const analysis = analyzeProject({
+      baseSha,
+      directory: project.directory,
+      executable,
+      prefix: project.prefix,
+      repositoryRoot: project.repositoryRoot,
+      scope: changes.scope,
+      targetEntry: project.targetEntry,
+    });
+    const parsed = parseDoctorReport(analysis.reportSource);
+    result = completedResult({
       blocking: request.blocking,
-      changes,
+      changes: { ...changes, scope: analysis.scope },
       directoryInput: request.directoryInput,
       parsed,
       prefix: project.prefix,
-    })
-  );
+    });
+  } catch (error) {
+    result = {
+      blocked: true,
+      blocking: request.blocking,
+      changedLines: {},
+      completed: false,
+      directory: request.directoryInput,
+      doctorVersion: undefined,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      findings: [],
+      metrics: emptyMetrics(),
+      repositoryPrefix: project.prefix,
+      resolved: [],
+      scope: request.requestedScope,
+      target: {
+        entry: project.targetEntry,
+        projects: [project.targetEntry],
+      },
+    };
+  }
+  emitResult(result);
 };
+
+const fallbackTarget = () => {
+  const entry = path.posix.normalize(
+    input("project", "tsconfig.json").replaceAll("\\", "/")
+  );
+  return { entry, projects: [entry] };
+};
+
+const fallbackDirectory = () =>
+  path.posix.normalize(input("directory", ".").replaceAll("\\", "/"));
 
 try {
   main();
@@ -523,8 +596,9 @@ try {
     errorMessage: error instanceof Error ? error.message : String(error),
     findings: [],
     metrics: emptyMetrics(),
-    repositoryPrefix: ".",
+    repositoryPrefix: fallbackDirectory(),
     resolved: [],
     scope: input("scope", "changed"),
+    target: fallbackTarget(),
   });
 }

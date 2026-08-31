@@ -1,0 +1,8 @@
+{
+  "name": "effect-doctor-action-test-double",
+  "version": "0.0.0",
+  "bin": {
+    "effect-doctor": "bin.mjs"
+  },
+  "type": "module"
+}

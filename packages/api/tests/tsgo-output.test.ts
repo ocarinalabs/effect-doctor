@@ -1,3 +1,14 @@
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -92,7 +103,22 @@ describe("decodeTsgoOutput", () => {
     );
   });
 
-  it("rejects unknown or mismatched Effect versions", () => {
+  it("rejects an ambiguous Effect version beside Effect v4", () => {
+    const output = structuredClone(validOutput);
+    output.files.push({
+      detectedEffect: "unknown",
+      file: "/workspace/src/plain.ts",
+      supportedEffect: "v3",
+    });
+    output.summary.filesChecked = 2;
+    output.summary.totalFiles = 2;
+
+    expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
+      /detected and supported Effect version/u
+    );
+  });
+
+  it("rejects a project without detected Effect v4 code", () => {
     const output = structuredClone(validOutput);
     const file = output.files.at(0);
     expect(file).toBeDefined();
@@ -100,14 +126,78 @@ describe("decodeTsgoOutput", () => {
       return;
     }
     file.detectedEffect = "unknown";
+    file.supportedEffect = "v3";
 
     expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
-      /supported Effect version/u
+      /detected and supported Effect version/u
+    );
+  });
+
+  it("rejects detected Effect v3 code in an Effect v4 project", () => {
+    const output = structuredClone(validOutput);
+    output.files.push({
+      detectedEffect: "v3",
+      file: "/workspace/src/legacy.ts",
+      supportedEffect: "v3",
+    });
+    output.summary.filesChecked = 2;
+    output.summary.totalFiles = 2;
+
+    expect(() => decodeTsgoOutput(JSON.stringify(output))).toThrowError(
+      /detected and supported Effect version/u
     );
   });
 });
 
 describe("normalizeTsgoFindings", () => {
+  it("canonicalizes native symlink paths before matching diagnostics", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "effect-doctor-tsgo-path-"));
+    const realDirectory = join(workspace, "real");
+    const linkedDirectory = join(workspace, "linked");
+    mkdirSync(realDirectory);
+    const sourceFile = join(realDirectory, "main.ts");
+    const source = "const x =\n  Effect.void";
+    writeFileSync(sourceFile, source);
+    symlinkSync(realDirectory, linkedDirectory, "junction");
+    const reportedFile = join(linkedDirectory, "main.ts");
+    const wire = structuredClone(validOutput);
+    const diagnostic = wire.diagnostics.at(0);
+    const file = wire.files.at(0);
+    expect(diagnostic).toBeDefined();
+    expect(file).toBeDefined();
+    if (diagnostic === undefined || file === undefined) {
+      return;
+    }
+    diagnostic.file = reportedFile;
+    diagnostic.start = 12;
+    file.file = reportedFile;
+    const output = decodeTsgoOutput(JSON.stringify(wire));
+
+    try {
+      await expect(
+        Effect.runPromise(
+          normalizeTsgoFindings({ files: [reportedFile], output }, [
+            {
+              absolute: realpathSync(sourceFile),
+              relative: "src/main.ts",
+              source,
+            },
+          ])
+        )
+      ).resolves.toMatchObject([
+        {
+          evidence: "Effect",
+          location: {
+            file: "src/main.ts",
+            start: { column: 3, line: 2 },
+          },
+        },
+      ]);
+    } finally {
+      rmSync(workspace, { force: true, recursive: true });
+    }
+  });
+
   it("matches Windows diagnostics to native snapshot paths", async () => {
     const wire = structuredClone(validOutput);
     const diagnostic = wire.diagnostics.at(0);

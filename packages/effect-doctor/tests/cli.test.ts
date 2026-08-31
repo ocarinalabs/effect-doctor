@@ -1,4 +1,17 @@
 import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -29,6 +42,46 @@ const runCliArguments = (arguments_: readonly string[]) =>
     timeout: 8000,
   });
 
+const rerunCommand = (output: string): string => {
+  const line = output.split("\n").find((value) => value.startsWith("Rerun: "));
+  expect(line).toBeDefined();
+  return line?.slice("Rerun: ".length) ?? "";
+};
+
+const executeRerun = (
+  command: string,
+  workspace: string
+): readonly string[] => {
+  const bin = join(workspace, "bin");
+  const trace = join(workspace, "rerun-arguments.json");
+  const executable = join(bin, "effect-doctor");
+  mkdirSync(bin);
+  writeFileSync(
+    executable,
+    [
+      "#!/usr/bin/env node",
+      'import { writeFileSync } from "node:fs";',
+      "writeFileSync(process.env.EFFECT_DOCTOR_RERUN_TRACE, JSON.stringify(process.argv.slice(2)));",
+      "",
+    ].join("\n")
+  );
+  chmodSync(executable, 0o755);
+  const result = spawnSync("/bin/sh", ["-c", command], {
+    cwd: workspace,
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      EFFECT_DOCTOR_RERUN_TRACE: trace,
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+    },
+  });
+  expect(
+    result.status,
+    [result.stdout, result.stderr].filter(Boolean).join("\n")
+  ).toBe(0);
+  return JSON.parse(readFileSync(trace, "utf-8")) as readonly string[];
+};
+
 describe("Effect Doctor CLI", () => {
   it("returns one when a finding crosses the blocking threshold", () => {
     const result = runCli(fixture("invalid"));
@@ -46,13 +99,21 @@ describe("Effect Doctor CLI", () => {
     const root = fixture("invalid-config");
     const result = runCli(root);
     const report = JSON.parse(result.stdout) as {
-      readonly error: { readonly message: string };
+      readonly error: {
+        readonly code: string;
+        readonly message: string;
+        readonly tag: string;
+      };
     };
 
     expect(result.status).toBe(2);
-    expect(report.error.message).toBe(
-      "Project configuration could not be analyzed."
-    );
+    expect(report.error).toMatchObject({
+      code: "project-invalid",
+      tag: "ProjectFailure",
+    });
+    expect(report.error.message.length).toBeGreaterThan(0);
+    expect(result.stdout).not.toContain('"root"');
+    expect(result.stdout).not.toContain('"stderr"');
     expect(result.stdout).not.toContain(root);
     expect(result.stdout).not.toContain("effectDoctorPrivateMarker.ts");
   }, 30_000);
@@ -77,19 +138,88 @@ describe("Effect Doctor CLI", () => {
     );
   });
 
-  it("renders a deterministic handoff for coding agents", () => {
-    const root = fixture("invalid");
-    const arguments_ = [root, "--format", "agent", "--blocking", "never"];
-    const result = runCliArguments(arguments_);
+  it.skipIf(process.platform === "win32")(
+    "renders an executable, injection-safe handoff for coding agents",
+    () => {
+      const workspace = mkdtempSync(
+        join(
+          fileURLToPath(new URL("../../api/tests/fixtures/", import.meta.url)),
+          "effect-doctor-cli-"
+        )
+      );
+      const root = join(workspace, "invalid '$(touch sentinel)'");
+      cpSync(fixture("invalid"), root, { recursive: true });
+      renameSync(join(root, "tsconfig.json"), join(root, "--config.json"));
 
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("Effect Doctor agent handoff (Effect v4)");
-    expect(result.stdout).toContain("Do not suppress rules");
-    expect(result.stdout).toMatch(/Fingerprint: [a-f0-9]{64}/u);
-    expect(result.stdout).toContain(
-      `Rerun: effect-doctor ${JSON.stringify(root)} --format agent --blocking never`
-    );
-    const repeated = runCliArguments(arguments_);
-    expect(repeated.stdout).toBe(result.stdout);
-  });
+      try {
+        const arguments_ = [
+          root,
+          "--project=--config.json",
+          "--format",
+          "agent",
+          "--blocking",
+          "never",
+        ];
+        const result = runCliArguments(arguments_);
+
+        expect(result.status).toBe(0);
+        expect(result.stdout).toContain(
+          "Effect Doctor agent handoff (Effect v4)"
+        );
+        expect(result.stdout).toContain("Do not suppress rules");
+        expect(result.stdout).toMatch(/Fingerprint: [a-f0-9]{64}/u);
+        expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual([
+          root,
+          "--project=--config.json",
+          "--format",
+          "agent",
+          "--blocking",
+          "never",
+        ]);
+        expect(existsSync(join(workspace, "sentinel"))).toBe(false);
+        const repeated = runCliArguments(arguments_);
+        expect(repeated.stdout).toBe(result.stdout);
+      } finally {
+        rmSync(workspace, { force: true, recursive: true });
+      }
+    },
+    30_000
+  );
+
+  it.skipIf(process.platform === "win32")(
+    "preserves one normalized project selector in comparison handoffs",
+    () => {
+      const workspace = mkdtempSync(join(tmpdir(), "effect-doctor-compare-"));
+      const baseline = fixture("invalid");
+      const candidate = fixture("invalid");
+      try {
+        const result = runCliArguments([
+          "compare",
+          baseline,
+          candidate,
+          "--project",
+          "./src/../tsconfig.json",
+          "--format",
+          "agent",
+          "--blocking",
+          "never",
+        ]);
+
+        expect(result.status).toBe(0);
+        expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual([
+          "compare",
+          baseline,
+          candidate,
+          "--project=tsconfig.json",
+          "--format",
+          "agent",
+          "--blocking",
+          "never",
+        ]);
+      } finally {
+        rmSync(workspace, { force: true, recursive: true });
+      }
+    },
+    30_000
+  );
 });

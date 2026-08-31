@@ -8,6 +8,9 @@ inputs:
   directory:
     description: Project directory to analyze
     default: .
+  project:
+    description: TypeScript project file relative to directory
+    default: tsconfig.json
   scope:
     description: "Pull request scope: changed, files, lines, or full. Other events always use full."
     default: changed
@@ -69,6 +72,7 @@ runs:
         GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         INPUT_BLOCKING: ${{ inputs.blocking }}
         INPUT_DIRECTORY: ${{ inputs.directory }}
+        INPUT_PROJECT: ${{ inputs.project }}
         INPUT_REVIEW_COMMENTS: ${{ inputs.review-comments }}
         INPUT_SCOPE: ${{ inputs.scope }}
         INPUT_VERSION: ${{ inputs.version }}

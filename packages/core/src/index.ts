@@ -22,7 +22,7 @@ export { sha256 } from "./internal/hash.js";
 export { compareCodeUnits } from "./internal/order.js";
 export { PINNED_TOOLCHAIN } from "./pinned-toolchain.js";
 export { ComparisonReportSchema, ScanReportSchema } from "./report.js";
-export type { ComparisonReport, ScanReport } from "./report.js";
+export type { ComparisonReport, ScanReport, ScanTarget } from "./report.js";
 export {
   effectOxlintRules,
   integrityOxlintRules,

@@ -34,6 +34,7 @@ Install the project before the scan. Type-aware checks need the same packages as
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `directory` | `.` | Effect v4 project directory |
+| `project` | `tsconfig.json` | TypeScript project file relative to `directory` |
 | `scope` | `changed` | `changed`, `files`, `lines`, or `full` |
 | `blocking` | `none` | `none`, `warning`, or `error` |
 | `comment` | `true` | Maintain one pull request summary |
@@ -44,7 +45,7 @@ Install the project before the scan. Type-aware checks need the same packages as
 
 On non-pull-request events, every scope behaves as `full`.
 
-The `changed` scope compares the base with the head and reports new Findings. The `files` scope reports all Findings in files that the pull request changes. The `lines` scope reports Findings that start on new or edited lines. The `full` scope reports the full head scan.
+The `changed` scope compares the base with the head and reports new Findings. Both checkouts use the selected `project`. If that project does not exist in the base, the Action reports a full head scan instead. The `files` scope reports all Findings in files that the pull request changes. The `lines` scope reports Findings that start on new or edited lines. The `full` scope reports the full head scan.
 
 The Action writes notes and a job summary before it checks the block level. If GitHub denies write access, the scan still runs and logs a warning.
 

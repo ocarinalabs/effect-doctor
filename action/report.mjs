@@ -1,17 +1,61 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 
-const identity = (directory) =>
-  createHash("sha256").update(directory).digest("hex").slice(0, 12);
+const targetPath = (directory, targetEntry) =>
+  directory === "." ? targetEntry : `${directory}/${targetEntry}`;
 
-export const commentMarker = (directory) =>
-  `<!-- effect-doctor-action:${identity(directory)} -->`;
-export const reviewMarker = (directory) =>
-  `<!-- effect-doctor-review:${identity(directory)} -->`;
-export const statusContext = (directory) =>
-  directory === "." ? "Effect Doctor" : `Effect Doctor (${directory})`;
+const identity = (directory, targetEntry) =>
+  createHash("sha256")
+    .update(`${directory}\0${targetEntry}`)
+    .digest("hex")
+    .slice(0, 12);
+
+export const commentMarker = (directory, targetEntry) =>
+  `<!-- effect-doctor-action:${identity(directory, targetEntry)} -->`;
+export const reviewMarker = (directory, targetEntry) =>
+  `<!-- effect-doctor-review:${identity(directory, targetEntry)} -->`;
+export const statusContext = (directory, targetEntry) =>
+  `Effect Doctor (${targetPath(directory, targetEntry)} · ${identity(directory, targetEntry)})`;
 
 const severities = ["error", "warning", "advice"];
+
+const isProjectPath = (value) =>
+  typeof value === "string" &&
+  value !== "." &&
+  !value.includes("\\") &&
+  !/^[A-Za-z]:/u.test(value) &&
+  !path.posix.isAbsolute(value) &&
+  !value.startsWith("../") &&
+  path.posix.normalize(value) === value;
+
+const parseTarget = (target) => {
+  if (
+    !isProjectPath(target?.entry) ||
+    !Array.isArray(target.projects) ||
+    !target.projects.every(isProjectPath) ||
+    !target.projects.includes(target.entry) ||
+    new Set(target.projects).size !== target.projects.length ||
+    target.projects.some(
+      (project, index) => index > 0 && target.projects[index - 1] >= project
+    )
+  ) {
+    throw new Error("Effect Doctor returned an invalid project target");
+  }
+  return target;
+};
+
+const targetFor = (report, isComparison) => {
+  const target = parseTarget(
+    isComparison ? report.candidate?.target : report.target
+  );
+  if (
+    isComparison &&
+    parseTarget(report.baseline?.target).entry !== target.entry
+  ) {
+    throw new Error("Effect Doctor compared different project targets");
+  }
+  return target;
+};
 
 const assertFinding = (finding) => {
   if (
@@ -37,13 +81,14 @@ export const parseDoctorReport = (source) => {
 
   const findings = isComparison ? report.introduced : report.findings;
   const resolved = isComparison ? report.resolved : [];
+  const target = targetFor(report, isComparison);
   if (!(Array.isArray(findings) && Array.isArray(resolved))) {
     throw new Error("Effect Doctor returned an invalid report");
   }
   for (const finding of [...findings, ...resolved]) {
     assertFinding(finding);
   }
-  return { findings, report, resolved };
+  return { findings, report, resolved, target };
 };
 
 export const metricsFor = (findings, resolved = []) => {
@@ -144,8 +189,9 @@ const findingLines = (findings) => {
 };
 
 export const renderSummary = (result) => {
+  const directory = result.repositoryPrefix ?? result.directory;
   const lines = [
-    commentMarker(result.repositoryPrefix ?? result.directory),
+    commentMarker(directory, result.target.entry),
     "## Effect Doctor",
     "",
     `**${summaryState(result)}.** ${summaryHeadline(result)}`,
@@ -156,7 +202,7 @@ export const renderSummary = (result) => {
     ...failureLines(result),
     ...findingLines(result.findings),
     "",
-    `_Effect Doctor ${result.doctorVersion ?? "unknown"} · ${result.scope} scope_`,
+    `_Effect Doctor ${result.doctorVersion ?? "unknown"} · ${result.scope} scope · ${targetPath(directory, result.target.entry)}_`,
   ];
   return lines.join("\n");
 };

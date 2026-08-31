@@ -2,6 +2,18 @@
   "schema": "effect-doctor/comparison/v1",
   "kind": "comparison",
   "doctorVersion": "0.1.0",
+  "baseline": {
+    "target": {
+      "entry": "tsconfig.json",
+      "projects": ["tsconfig.json"]
+    }
+  },
+  "candidate": {
+    "target": {
+      "entry": "tsconfig.json",
+      "projects": ["tsconfig.json"]
+    }
+  },
   "introduced": [
     {
       "category": "correctness",

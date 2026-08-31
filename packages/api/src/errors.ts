@@ -3,6 +3,19 @@ import { Schema } from "effect";
 export class ProjectFailure extends Schema.TaggedError<ProjectFailure>()(
   "ProjectFailure",
   {
+    code: Schema.Literals([
+      "coverage-mismatch",
+      "duplicate-source",
+      "empty-project",
+      "outside-root",
+      "project-changed",
+      "project-invalid",
+      "project-not-found",
+      "reference-cycle",
+      "reference-invalid",
+      "root-unavailable",
+      "workspace-unavailable",
+    ]),
     message: Schema.String,
     root: Schema.String,
   }

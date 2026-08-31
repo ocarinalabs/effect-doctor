@@ -170,7 +170,7 @@ try {
   mkdirSync(tarballDirectory);
   mkdirSync(projectsDirectory, { recursive: true });
 
-  for (const fixture of ["clean", "invalid", "invalid-config"]) {
+  for (const fixture of ["clean", "invalid", "invalid-config", "solution"]) {
     cpSync(join(fixtureRoot, fixture), join(projectsDirectory, fixture), {
       recursive: true,
     });
@@ -324,23 +324,70 @@ try {
     "A scan engine was incomplete"
   );
 
-  const failedScan = JSON.parse(
+  const solution = JSON.parse(
     run({
       arguments: cliArguments([
-        join(projectsDirectory, "invalid-config"),
+        join(projectsDirectory, "solution"),
+        "--project",
+        "tsconfig.json",
         "--format",
         "json",
       ]),
       command: cliCommand,
       cwd: consumerDirectory,
-      expectedExit: 2,
-      label: "scan-invalid-config",
+      expectedExit: 0,
+      label: "scan-solution",
     })
   );
   assert(
+    JSON.stringify(solution.target) ===
+      JSON.stringify({
+        entry: "tsconfig.json",
+        projects: [
+          "packages/app/tsconfig.json",
+          "packages/shared/tsconfig.json",
+          "tsconfig.json",
+        ],
+      }),
+    "The packaged CLI did not preserve the selected project graph"
+  );
+  assert(
+    solution.engines.length === 3 &&
+      solution.engines.every(
+        (engine) =>
+          engine.complete &&
+          JSON.stringify(engine.analyzedFiles) ===
+            JSON.stringify([
+              "packages/app/src/main.ts",
+              "packages/shared/src/shared.ts",
+            ])
+      ),
+    "The packaged CLI did not analyze the complete solution inventory"
+  );
+
+  const failedScanOutput = run({
+    arguments: cliArguments([
+      join(projectsDirectory, "invalid-config"),
+      "--format",
+      "json",
+    ]),
+    command: cliCommand,
+    cwd: consumerDirectory,
+    expectedExit: 2,
+    label: "scan-invalid-config",
+  });
+  const failedScan = JSON.parse(failedScanOutput);
+  assert(
     failedScan.schema === "effect-doctor/error/v1" &&
       failedScan.status === "failed" &&
-      failedScan.error?.tag === "ProjectFailure",
+      failedScan.error?.tag === "ProjectFailure" &&
+      failedScan.error.code === "project-invalid" &&
+      typeof failedScan.error.message === "string" &&
+      failedScan.error.message.length > 0 &&
+      failedScan.error.root === undefined &&
+      failedScan.error.stderr === undefined &&
+      !failedScanOutput.includes(join(projectsDirectory, "invalid-config")) &&
+      !failedScanOutput.includes("effectDoctorPrivateMarker.ts"),
     "The packaged CLI did not preserve its fail-closed error contract"
   );
 
@@ -350,6 +397,8 @@ try {
         "compare",
         join(projectsDirectory, "clean"),
         join(projectsDirectory, "invalid"),
+        "--project",
+        "tsconfig.json",
         "--format",
         "json",
       ]),
@@ -363,6 +412,11 @@ try {
   assert(
     comparison.schema === "effect-doctor/comparison/v1",
     "Unexpected comparison schema"
+  );
+  assert(
+    comparison.baseline.target.entry === "tsconfig.json" &&
+      comparison.candidate.target.entry === "tsconfig.json",
+    "The packaged comparison did not preserve its project selector"
   );
   assert(
     introduced.length === 2 &&
@@ -461,6 +515,10 @@ try {
       engines: scan.engines.map((engine) => engine.engine),
       schema: scan.schema,
       summary: scan.summary,
+    },
+    solution: {
+      target: solution.target,
+      analyzedFiles: solution.engines[0].analyzedFiles,
     },
     schema: "effect-doctor/verification/v1",
     status: "passed",

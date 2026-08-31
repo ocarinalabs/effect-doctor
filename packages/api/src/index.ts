@@ -12,6 +12,7 @@ export type {
   FindingSummary,
   RuleMetadata,
   ScanReport,
+  ScanTarget,
 } from "@effect-doctor/core";
 export { compareProjects } from "./compare.js";
 export type { CompareRequest } from "./compare.js";

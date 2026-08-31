@@ -4,6 +4,7 @@ import type {
   Finding,
   FindingSummary,
   ScanReport,
+  ScanTarget,
 } from "@effect-doctor/core";
 import { NodeServices } from "@effect/platform-node";
 import { FileSystem, Path, Effect } from "effect";
@@ -16,6 +17,7 @@ import {
   oxlintAnalyzerRuns,
   runOxlint,
 } from "./internal/oxlint.js";
+import { projectRelativePath } from "./internal/project-path.js";
 import {
   makeProjectSnapshot,
   verifyProjectSnapshot,
@@ -30,6 +32,7 @@ import {
 import { DOCTOR_VERSION } from "./version.js";
 
 export type ScanRequest = {
+  readonly project?: string;
   readonly root: string;
 };
 
@@ -47,6 +50,7 @@ const resolveProjectRoot = Effect.fn("resolveProjectRoot")(function* (
     Effect.mapError(
       () =>
         new ProjectFailure({
+          code: "root-unavailable",
           message: "Project root does not exist or cannot be resolved",
           root: requestedRoot,
         })
@@ -54,31 +58,80 @@ const resolveProjectRoot = Effect.fn("resolveProjectRoot")(function* (
   );
 });
 
-const requireTsconfig = Effect.fn("requireTsconfig")(function* (root: string) {
+const resolveEntryProject = Effect.fn("resolveEntryProject")(function* (
+  root: string,
+  requestedProject: string
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const tsconfig = path.join(root, "tsconfig.json");
-  const exists = yield* fs.exists(tsconfig).pipe(
+  if (path.isAbsolute(requestedProject)) {
+    return yield* new ProjectFailure({
+      code: "outside-root",
+      message:
+        "Project configuration must be a root-relative path inside the project root.",
+      root,
+    });
+  }
+
+  const candidate = path.resolve(root, requestedProject);
+  let entry: string;
+  try {
+    entry = projectRelativePath(root, candidate);
+  } catch {
+    return yield* new ProjectFailure({
+      code: "outside-root",
+      message:
+        "Project configuration must be a root-relative path inside the project root.",
+      root,
+    });
+  }
+
+  const tsconfig = yield* fs.realPath(candidate).pipe(
     Effect.mapError(
       () =>
         new ProjectFailure({
-          message: "Unable to inspect the project tsconfig.json",
+          code: "project-not-found",
+          message:
+            "The selected project configuration does not exist or cannot be resolved.",
           root,
         })
     )
   );
-  if (!exists) {
+  try {
+    projectRelativePath(root, tsconfig);
+  } catch {
     return yield* new ProjectFailure({
-      message: "Effect Doctor currently requires a root tsconfig.json",
+      code: "outside-root",
+      message:
+        "Project configuration must be a root-relative path inside the project root.",
       root,
     });
   }
-  return tsconfig;
+  const info = yield* fs.stat(tsconfig).pipe(
+    Effect.mapError(
+      () =>
+        new ProjectFailure({
+          code: "project-not-found",
+          message:
+            "The selected project configuration does not exist or cannot be resolved.",
+          root,
+        })
+    )
+  );
+  if (info.type !== "File") {
+    return yield* new ProjectFailure({
+      code: "project-invalid",
+      message: "The selected project configuration must be a file.",
+      root,
+    });
+  }
+  return { entry, tsconfig };
 });
 
 const makeReport = (
   runs: readonly AnalyzerRun[],
   findings: readonly Finding[],
+  target: ScanTarget,
   versions: ToolchainVersions
 ): ScanReport => ({
   doctorVersion: DOCTOR_VERSION,
@@ -88,6 +141,7 @@ const makeReport = (
   root: ".",
   schema: "effect-doctor/scan/v1",
   summary: summarize(findings),
+  target,
   toolchain: {
     effect: versions.effect,
     effectOxlint: versions.effectOxlint,
@@ -101,15 +155,21 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
   request: ScanRequest
 ) {
   const root = yield* resolveProjectRoot(request.root);
-  const tsconfig = yield* requireTsconfig(root);
+  const selected = yield* resolveEntryProject(
+    root,
+    request.project ?? "tsconfig.json"
+  );
   const toolchain = yield* resolveToolchain();
   const snapshot = yield* makeProjectSnapshot(
     root,
-    tsconfig,
+    selected,
     toolchain.tsgoExecutable
   );
   const [tsgoAnalysis, oxlintAnalysis] = yield* Effect.all(
-    [runTsgo(toolchain, tsconfig), runOxlint(toolchain, root, snapshot.files)],
+    [
+      runTsgo(toolchain, selected.tsconfig),
+      runOxlint(toolchain, root, snapshot.files),
+    ],
     { concurrency: 2 }
   );
   const tsgoRun = yield* validateTsgoFiles(
@@ -137,7 +197,7 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
     compareFindingOrder
   );
   yield* verifyProjectSnapshot(snapshot, toolchain.tsgoExecutable);
-  return makeReport(runs, findings, toolchain.versions);
+  return makeReport(runs, findings, snapshot.target, toolchain.versions);
 });
 
 export const scanProject = (
