@@ -2,20 +2,28 @@ import { defineConfig } from "oxlint";
 import { recommended as effectRecommended } from "oxlint-plugin-effect/presets/recommended";
 import core from "ultracite/oxlint/core";
 
+import { RECOMMENDED_RULES as effectDoctorRecommended } from "./packages/oxlint-plugin-effect-doctor/src/rules.ts";
+
 export default defineConfig({
   extends: [core],
   ignorePatterns: [
     ...(core.ignorePatterns ?? []),
-    "docs/research/**",
-    "dist/**",
-    "tests/fixtures/**",
-    "vendor/**",
+    "**/dist/**",
+    "packages/*/tests/fixtures/**",
+    "packages/*/vendor/**",
   ],
-  jsPlugins: ["oxlint-plugin-effect/plugin"],
+  jsPlugins: [
+    "oxlint-plugin-effect/plugin",
+    {
+      name: "effect-doctor",
+      specifier: "./packages/oxlint-plugin-effect-doctor/src/index.ts",
+    },
+  ],
   overrides: [
     {
-      files: ["src/**/*.ts"],
+      files: ["packages/*/src/**/*.ts"],
       rules: {
+        ...effectDoctorRecommended,
         ...effectRecommended,
         "effect/noConditionalEmptyObjectSpread": "off",
         "effect/noNewError": "off",
@@ -26,7 +34,11 @@ export default defineConfig({
       },
     },
     {
-      files: ["src/internal/**/*.ts", "src/bin.ts"],
+      files: [
+        "packages/*/src/internal/**/*.ts",
+        "packages/effect-doctor/src/bin.ts",
+        "packages/oxlint-plugin-effect-doctor/src/plugin/**/*.ts",
+      ],
       rules: {
         "effect/noAs": "off",
         "effect/noDynamicImports": "off",
@@ -39,14 +51,17 @@ export default defineConfig({
       },
     },
     {
-      files: ["src/cli.ts", "src/render.ts"],
+      files: [
+        "packages/effect-doctor/src/cli.ts",
+        "packages/effect-doctor/src/render.ts",
+      ],
       rules: {
         "effect/noGlobals": "off",
         "effect/noNullish": "off",
       },
     },
     {
-      files: ["tests/**/*.ts"],
+      files: ["packages/*/tests/**/*.ts"],
       rules: {
         "effect/noModuleMocks": "error",
         "effect/noTestLifecycleHooks": "error",

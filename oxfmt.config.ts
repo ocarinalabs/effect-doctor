@@ -5,9 +5,8 @@ export default defineConfig({
   ...ultracite,
   ignorePatterns: [
     ...(ultracite.ignorePatterns ?? []),
-    "docs/research/**",
-    "dist/**",
-    "tests/fixtures/**",
-    "vendor/**",
+    "**/dist/**",
+    "packages/*/tests/fixtures/**",
+    "packages/*/vendor/**",
   ],
 });

@@ -1,27 +1,10 @@
 {
-  "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "declaration": true,
-    "declarationMap": true,
-    "exactOptionalPropertyTypes": true,
-    "lib": ["ES2024"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "noEmit": true,
-    "noUncheckedIndexedAccess": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "strict": true,
-    "target": "ES2024",
-    "types": ["node", "vitest/globals"],
-    "verbatimModuleSyntax": true
-  },
+  "extends": "./tsconfig.base.json",
   "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts",
-    "oxlint.config.ts",
-    "oxfmt.config.ts"
-  ],
-  "exclude": ["tests/fixtures/**"]
+    "packages/*/src/**/*.ts",
+    "packages/*/vite.config.ts",
+    "tooling/**/*.ts",
+    "oxfmt.config.ts",
+    "oxlint.config.ts"
+  ]
 }
