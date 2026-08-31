@@ -24,7 +24,7 @@ export default function HomePage() {
           <p className="eyebrow">
             <span className="status-dot" /> Effect v4 release candidate
           </p>
-          <h1>Find the Effect Bugs Ordinary Tools Miss</h1>
+          <h1>Find Effect Bugs Ordinary Tools Miss</h1>
           <p className="hero-lede">
             Effect Doctor combines type-aware and structural checks in one
             deterministic scan. It reads your code, proves what ran, and leaves
@@ -62,15 +62,15 @@ export default function HomePage() {
           <div className="receipt-preview">
             <span>✓ project snapshot fixed</span>
             <span>✓ three analyzers complete</span>
-            <span>✓ policy receipt attached</span>
+            <span>✓ scan receipt attached</span>
           </div>
         </div>
       </section>
 
       <section aria-labelledby="inventory-heading" className="section shell">
         <div className="section-heading">
-          <p className="eyebrow">One inventory</p>
-          <h2 id="inventory-heading">Every Rule Has an Owner</h2>
+          <p className="eyebrow">Rule inventory</p>
+          <h2 id="inventory-heading">One Catalog, No Copied Counts</h2>
           <p>
             The catalog comes from the same metadata used by the CLI. The site
             does not keep a second copy.
@@ -96,8 +96,8 @@ export default function HomePage() {
       >
         <div className="shell proof-grid">
           <div className="section-heading">
-            <p className="eyebrow">A higher bar</p>
-            <h2 id="proof-heading">Trust the Run Before You Trust a Finding</h2>
+            <p className="eyebrow">Scan integrity</p>
+            <h2 id="proof-heading">Verify the Run Before the Finding</h2>
           </div>
           <div className="proof-list">
             <article>
@@ -136,13 +136,13 @@ export default function HomePage() {
         className="section shell workflow"
       >
         <div className="section-heading">
-          <p className="eyebrow">Use it where work happens</p>
-          <h2 id="workflow-heading">CLI, Pull Requests, and Coding Agents</h2>
+          <p className="eyebrow">Integrations</p>
+          <h2 id="workflow-heading">Where Effect Doctor Runs</h2>
         </div>
         <div className="workflow-grid">
           <article>
             <span className="card-kicker">CLI</span>
-            <h3>Scan or Compare</h3>
+            <h3>Scan and Compare</h3>
             <p>
               Get readable output, deterministic JSON, or a compact agent
               handoff.
@@ -150,15 +150,15 @@ export default function HomePage() {
           </article>
           <article>
             <span className="card-kicker">GitHub Action</span>
-            <h3>Review Only What Changed</h3>
+            <h3>Review Changed Findings</h3>
             <p>
-              Report introduced findings with one status, summary, and review
-              thread.
+              Publish one commit status and pull request summary, plus inline
+              comments for introduced findings.
             </p>
           </article>
           <article>
             <span className="card-kicker">Plugins</span>
-            <h3>Keep First-Party Rules Close</h3>
+            <h3>Run First-Party Rules</h3>
             <p>
               Use the Effect Doctor rules through Oxlint or an ESLint flat
               config.
@@ -169,8 +169,8 @@ export default function HomePage() {
 
       <section className="shell final-callout">
         <div>
-          <p className="eyebrow">Read the contract</p>
-          <h2>See Every Active Rule Before You Run It</h2>
+          <p className="eyebrow">Rule reference</p>
+          <h2>Inspect the Rule Catalog</h2>
         </div>
         <Link className="button button-primary" href="/rules">
           Open Rule Catalog

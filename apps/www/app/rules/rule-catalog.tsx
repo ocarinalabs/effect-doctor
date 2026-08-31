@@ -82,7 +82,7 @@ export const RuleCatalog = ({
             autoComplete="off"
             name="rule-search"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Try “floating effect”…"
+            placeholder="Try floating effect"
             spellCheck={false}
             type="search"
             value={query}
