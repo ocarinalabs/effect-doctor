@@ -1,0 +1,61 @@
+{
+  "schema": "effect-doctor/scan/v1",
+  "kind": "scan",
+  "doctorVersion": "0.1.0",
+  "findings": [
+    {
+      "category": "correctness",
+      "evidence": "Effect.runSync(program)",
+      "fingerprint": "first",
+      "location": {
+        "file": "src/program.ts",
+        "start": { "line": 7, "column": 3 },
+        "end": { "line": 7, "column": 26 }
+      },
+      "message": "This Effect can suspend and cannot be run synchronously.",
+      "provenance": {
+        "engine": "effect-doctor",
+        "nativeRuleId": "no-run-sync-on-suspending-effect"
+      },
+      "ruleId": "effect-doctor/no-run-sync-on-suspending-effect",
+      "severity": "error",
+      "title": "Avoid runSync for suspending Effects"
+    },
+    {
+      "category": "effect-native",
+      "evidence": "console.log(value)",
+      "fingerprint": "second",
+      "location": {
+        "file": "src/log.ts",
+        "start": { "line": 4, "column": 1 },
+        "end": { "line": 4, "column": 19 }
+      },
+      "message": "Use Effect logging with structured fields.",
+      "provenance": {
+        "engine": "effect-doctor",
+        "nativeRuleId": "prefer-structured-log-data"
+      },
+      "ruleId": "effect-doctor/prefer-structured-log-data",
+      "severity": "warning",
+      "title": "Prefer structured Effect logging"
+    },
+    {
+      "category": "style",
+      "evidence": "const task = Effect.succeed(1)",
+      "fingerprint": "third",
+      "location": {
+        "file": "src/program.ts",
+        "start": { "line": 12, "column": 1 },
+        "end": { "line": 12, "column": 31 }
+      },
+      "message": "Name reusable Effect values with an Effect suffix.",
+      "provenance": {
+        "engine": "effect-doctor",
+        "nativeRuleId": "consistent-effect-fn-name"
+      },
+      "ruleId": "effect-doctor/consistent-effect-fn-name",
+      "severity": "advice",
+      "title": "Use consistent Effect names"
+    }
+  ]
+}
