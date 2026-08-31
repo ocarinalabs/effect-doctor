@@ -4,7 +4,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
     "catalog:check": {},
     "catalog:generate": {
@@ -17,6 +17,11 @@
       "dependsOn": ["build", "^test"]
     },
     "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },

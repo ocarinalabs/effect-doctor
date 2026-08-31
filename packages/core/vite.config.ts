@@ -7,7 +7,7 @@ export default defineConfig({
         neverBundle: ["effect"],
       },
       dts: true,
-      entry: { index: "./src/index.ts" },
+      entry: { index: "./src/index.ts", rules: "./src/rules.ts" },
       fixedExtension: false,
       platform: "node",
       target: "node22",
