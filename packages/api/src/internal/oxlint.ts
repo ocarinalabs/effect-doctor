@@ -13,6 +13,7 @@ import type {
   Finding,
   FindingWithoutFingerprint,
   RuleCatalogEntry,
+  SourceApplicability,
 } from "@effect-doctor/core";
 import { FileSystem, Path, Effect } from "effect";
 import { RECOMMENDED_RULES } from "oxlint-plugin-effect-doctor";
@@ -26,7 +27,10 @@ import { DOCTOR_VERSION } from "../version.js";
 import { decodeOxlintOutput } from "./oxlint-output.js";
 import type { OxlintDiagnostic } from "./oxlint-output.js";
 import { runProcess } from "./process.js";
-import { INTEGRITY_VISIT_MESSAGE } from "./rules/diagnostic-suppression-contract.js";
+import {
+  DIRECT_EFFECT_REFERENCE_VISIT_MESSAGE,
+  isIntegrityVisitMessage,
+} from "./rules/diagnostic-suppression-contract.js";
 import type { ToolchainPaths } from "./toolchain.js";
 import type { AnalyzedSource } from "./tsgo.js";
 
@@ -81,7 +85,10 @@ const makeIntegrityConfig = (doctorPluginPath: string): string =>
 
 export type OxlintAnalysis = {
   readonly diagnostics: readonly OxlintDiagnosticWithPass[];
+  readonly sourceProfiles: readonly OxlintSourceProfile[];
 };
+
+export type OxlintSourceProfile = SourceApplicability;
 
 type OxlintPass = "primary" | "integrity";
 
@@ -281,8 +288,10 @@ const validateIntegrityAnalysis = Effect.fn("validateIntegrityAnalysis")(
       });
     }
 
-    const visits = analysis.diagnostics
-      .filter((diagnostic) => diagnostic.message === INTEGRITY_VISIT_MESSAGE)
+    const visitDiagnostics = analysis.diagnostics.filter((diagnostic) =>
+      isIntegrityVisitMessage(diagnostic.message)
+    );
+    const visits = visitDiagnostics
       .map((diagnostic) => path.resolve(directory, diagnostic.filename))
       .sort(compareCodeUnits);
     const expectedVisits = mirrored
@@ -302,9 +311,23 @@ const validateIntegrityAnalysis = Effect.fn("validateIntegrityAnalysis")(
         originals[index]?.absolute,
       ])
     );
+    const directReferenceFiles = new Set(
+      visitDiagnostics
+        .filter(
+          (diagnostic) =>
+            diagnostic.message === DIRECT_EFFECT_REFERENCE_VISIT_MESSAGE
+        )
+        .map((diagnostic) => path.resolve(directory, diagnostic.filename))
+    );
+    const sourceProfiles = mirrored
+      .map((source) => ({
+        directEffectModuleReference: directReferenceFiles.has(source.absolute),
+        file: source.relative,
+      }))
+      .sort((left, right) => compareCodeUnits(left.file, right.file));
     const diagnostics: OxlintDiagnostic[] = [];
     for (const diagnostic of analysis.diagnostics) {
-      if (diagnostic.message === INTEGRITY_VISIT_MESSAGE) {
+      if (isIntegrityVisitMessage(diagnostic.message)) {
         continue;
       }
       const mirroredPath = path.resolve(directory, diagnostic.filename);
@@ -318,7 +341,7 @@ const validateIntegrityAnalysis = Effect.fn("validateIntegrityAnalysis")(
       }
       diagnostics.push({ ...diagnostic, filename: original });
     }
-    return diagnostics;
+    return { diagnostics, sourceProfiles };
   }
 );
 
@@ -365,7 +388,7 @@ export const runOxlint = Effect.fn("runOxlint")(function* (
         ],
         { concurrency: 2 }
       );
-      const integrityDiagnostics = yield* validateIntegrityAnalysis(
+      const integrityEvidence = yield* validateIntegrityAnalysis(
         root,
         integrity.directory,
         integrityAnalysis,
@@ -378,11 +401,12 @@ export const runOxlint = Effect.fn("runOxlint")(function* (
             ...diagnostic,
             pass: "primary" as const,
           })),
-          ...integrityDiagnostics.map((diagnostic) => ({
+          ...integrityEvidence.diagnostics.map((diagnostic) => ({
             ...diagnostic,
             pass: "integrity" as const,
           })),
         ],
+        sourceProfiles: integrityEvidence.sourceProfiles,
       } satisfies OxlintAnalysis;
     })
   );
@@ -564,7 +588,7 @@ const makeOxlintFinding = Effect.fn("makeOxlintFinding")(function* (
 export const normalizeOxlintFindings = Effect.fn("normalizeOxlintFindings")(
   function* (
     root: string,
-    analysis: OxlintAnalysis,
+    analysis: Pick<OxlintAnalysis, "diagnostics">,
     sources: readonly AnalyzedSource[]
   ) {
     const path = yield* Path.Path;

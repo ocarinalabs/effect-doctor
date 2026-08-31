@@ -57,6 +57,117 @@ const targetFor = (report, isComparison) => {
   return target;
 };
 
+const isNatural = (value) => Number.isInteger(value) && value >= 0;
+
+const parsePolicy = (policy) => {
+  if (
+    policy?.activeRuleCount !== 150 ||
+    policy.id !== "effect-v4/default" ||
+    policy.revision !== 1 ||
+    typeof policy.digest !== "string" ||
+    !/^[0-9a-f]{64}$/u.test(policy.digest)
+  ) {
+    throw new Error("Effect Doctor returned an invalid scan policy");
+  }
+  return policy;
+};
+
+const samePolicy = (left, right) =>
+  left.activeRuleCount === right.activeRuleCount &&
+  left.digest === right.digest &&
+  left.id === right.id &&
+  left.revision === right.revision;
+
+const isCanonicalUnique = (values) =>
+  new Set(values).size === values.length &&
+  values.every((value, index) => index === 0 || values[index - 1] < value);
+
+const areSourceProfilesValid = (files) => {
+  if (!(Array.isArray(files) && files.length > 0)) {
+    return false;
+  }
+  const paths = files.map((profile) => profile?.file);
+  return (
+    files.every(
+      (profile) =>
+        isProjectPath(profile?.file) &&
+        typeof profile.directEffectModuleReference === "boolean"
+    ) && isCanonicalUnique(paths)
+  );
+};
+
+const areNotApplicableGroupsValid = (groups) => {
+  if (!Array.isArray(groups)) {
+    return false;
+  }
+  const ruleIds = groups.map((group) => group?.ruleId);
+  return (
+    groups.every(
+      (group) =>
+        Number.isInteger(group?.count) &&
+        group.count >= 1 &&
+        group.reason === "missing-direct-effect-module-reference" &&
+        typeof group.ruleId === "string" &&
+        group.ruleId.length > 0
+    ) && isCanonicalUnique(ruleIds)
+  );
+};
+
+const parseApplicability = (applicability, applicableFindingCount) => {
+  const files = applicability?.files;
+  const groups = applicability?.notApplicable?.groups;
+  const total = applicability?.notApplicable?.total;
+  const normalized = applicability?.normalizedDiagnosticCount;
+  const groupedTotal = Array.isArray(groups)
+    ? groups.reduce((sum, group) => sum + (group?.count ?? 0), 0)
+    : -1;
+  if (
+    !areSourceProfilesValid(files) ||
+    !areNotApplicableGroupsValid(groups) ||
+    !isNatural(total) ||
+    !isNatural(normalized) ||
+    groupedTotal !== total ||
+    normalized < total ||
+    (applicableFindingCount !== undefined &&
+      normalized !== applicableFindingCount + total)
+  ) {
+    throw new Error("Effect Doctor returned an invalid applicability receipt");
+  }
+  return applicability;
+};
+
+const receiptFor = (report, isComparison) => {
+  if (!isComparison) {
+    return {
+      applicability: parseApplicability(
+        report.applicability,
+        Array.isArray(report.findings) ? report.findings.length : undefined
+      ),
+      policy: parsePolicy(report.policy),
+    };
+  }
+  const baselinePolicy = parsePolicy(report.baseline?.policy);
+  const candidatePolicy = parsePolicy(report.candidate?.policy);
+  if (!samePolicy(baselinePolicy, candidatePolicy)) {
+    throw new Error("Effect Doctor compared different scan policies");
+  }
+  parseApplicability(
+    report.baseline?.applicability,
+    Array.isArray(report.baseline?.findings)
+      ? report.baseline.findings.length
+      : undefined
+  );
+  return {
+    applicability: parseApplicability(
+      report.candidate?.applicability,
+      Array.isArray(report.candidate?.findings)
+        ? report.candidate.findings.length
+        : undefined
+    ),
+    policy: candidatePolicy,
+  };
+};
+
 const assertFinding = (finding) => {
   if (
     typeof finding !== "object" ||
@@ -88,7 +199,13 @@ export const parseDoctorReport = (source) => {
   for (const finding of [...findings, ...resolved]) {
     assertFinding(finding);
   }
-  return { findings, report, resolved, target };
+  return {
+    findings,
+    report,
+    resolved,
+    target,
+    ...receiptFor(report, isComparison),
+  };
 };
 
 export const metricsFor = (findings, resolved = []) => {
@@ -188,6 +305,19 @@ const findingLines = (findings) => {
   return lines;
 };
 
+const receiptLines = (result) => {
+  if (!(result.completed && result.policy && result.applicability)) {
+    return [];
+  }
+  const applicable =
+    result.applicability.normalizedDiagnosticCount -
+    result.applicability.notApplicable.total;
+  return [
+    "",
+    `${result.policy.activeRuleCount} active rules · ${applicable} findings · ${result.applicability.notApplicable.total} diagnostics not applicable.`,
+  ];
+};
+
 export const renderSummary = (result) => {
   const directory = result.repositoryPrefix ?? result.directory;
   const lines = [
@@ -199,6 +329,7 @@ export const renderSummary = (result) => {
     "| Errors | Warnings | Advice | Resolved |",
     "| ---: | ---: | ---: | ---: |",
     `| ${result.metrics.errorCount} | ${result.metrics.warningCount} | ${result.metrics.adviceCount} | ${result.metrics.resolvedCount} |`,
+    ...receiptLines(result),
     ...failureLines(result),
     ...findingLines(result.findings),
     "",

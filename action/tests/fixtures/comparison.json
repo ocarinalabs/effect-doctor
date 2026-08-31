@@ -3,12 +3,50 @@
   "kind": "comparison",
   "doctorVersion": "0.1.0",
   "baseline": {
+    "policy": {
+      "activeRuleCount": 150,
+      "digest": "4f6f047d4fb5b1c85f623439f0836bf1c2268bcd1377afbfb75eae74b15f91bb",
+      "id": "effect-v4/default",
+      "revision": 1
+    },
+    "applicability": {
+      "files": [
+        {
+          "directEffectModuleReference": true,
+          "file": "src/old.ts"
+        }
+      ],
+      "normalizedDiagnosticCount": 1,
+      "notApplicable": {
+        "groups": [],
+        "total": 0
+      }
+    },
     "target": {
       "entry": "tsconfig.json",
       "projects": ["tsconfig.json"]
     }
   },
   "candidate": {
+    "policy": {
+      "activeRuleCount": 150,
+      "digest": "4f6f047d4fb5b1c85f623439f0836bf1c2268bcd1377afbfb75eae74b15f91bb",
+      "id": "effect-v4/default",
+      "revision": 1
+    },
+    "applicability": {
+      "files": [
+        {
+          "directEffectModuleReference": true,
+          "file": "src/program.ts"
+        }
+      ],
+      "normalizedDiagnosticCount": 1,
+      "notApplicable": {
+        "groups": [],
+        "total": 0
+      }
+    },
     "target": {
       "entry": "tsconfig.json",
       "projects": ["tsconfig.json"]

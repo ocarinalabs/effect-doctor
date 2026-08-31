@@ -323,6 +323,21 @@ try {
     scan.engines.every((engine) => engine.complete),
     "A scan engine was incomplete"
   );
+  assert(
+    scan.policy?.activeRuleCount === 150 &&
+      scan.policy.id === "effect-v4/default" &&
+      scan.policy.revision === 1 &&
+      /^[0-9a-f]{64}$/u.test(scan.policy.digest),
+    "The scan did not preserve the fixed Effect v4 policy"
+  );
+  assert(
+    scan.applicability?.normalizedDiagnosticCount ===
+      scan.findings.length + scan.applicability.notApplicable.total &&
+      JSON.stringify(
+        scan.applicability.files.map((profile) => profile.file)
+      ) === JSON.stringify(scan.engines[0].analyzedFiles),
+    "The scan applicability receipt does not reconcile"
+  );
 
   const solution = JSON.parse(
     run({
@@ -424,6 +439,10 @@ try {
       introduced.includes("effect/no-unbounded-retry"),
     "The comparison did not report the two expected findings"
   );
+  assert(
+    comparison.baseline.policy.digest === comparison.candidate.policy.digest,
+    "The packaged comparison mixed scan policies"
+  );
 
   const rules = run({
     arguments: cliArguments(["rules", "list"]),
@@ -476,9 +495,12 @@ try {
   );
   for (const exportName of [
     "AnalyzerFailure",
+    "ApplicabilityReportSchema",
     "ComparisonReportSchema",
     "InvalidAnalyzerOutput",
     "ProjectFailure",
+    "SCAN_POLICY",
+    "ScanPolicySchema",
     "ScanReportSchema",
     "compareProjects",
     "knownRules",
@@ -512,7 +534,9 @@ try {
     projectsDigest: projectsAfter,
     ruleCount: rules.length,
     scan: {
+      applicability: scan.applicability,
       engines: scan.engines.map((engine) => engine.engine),
+      policy: scan.policy,
       schema: scan.schema,
       summary: scan.summary,
     },

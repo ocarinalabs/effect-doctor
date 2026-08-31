@@ -1,5 +1,10 @@
-import { compareFindingOrder } from "@effect-doctor/core";
+import {
+  applyRuleApplicability,
+  compareFindingOrder,
+  SCAN_POLICY,
+} from "@effect-doctor/core";
 import type {
+  ApplicabilityReport,
   AnalyzerRun,
   Finding,
   FindingSummary,
@@ -131,13 +136,16 @@ const resolveEntryProject = Effect.fn("resolveEntryProject")(function* (
 const makeReport = (
   runs: readonly AnalyzerRun[],
   findings: readonly Finding[],
+  applicability: ApplicabilityReport,
   target: ScanTarget,
   versions: ToolchainVersions
 ): ScanReport => ({
+  applicability,
   doctorVersion: DOCTOR_VERSION,
   engines: runs,
   findings,
   kind: "scan",
+  policy: SCAN_POLICY,
   root: ".",
   schema: "effect-doctor/scan/v1",
   summary: summarize(findings),
@@ -193,11 +201,21 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
     sources
   );
   const tsgoFindings = yield* normalizeTsgoFindings(tsgoAnalysis, sources);
-  const findings = [...tsgoFindings, ...oxlintFindings].sort(
+  const normalizedFindings = [...tsgoFindings, ...oxlintFindings].sort(
     compareFindingOrder
   );
+  const applied = applyRuleApplicability(
+    normalizedFindings,
+    oxlintAnalysis.sourceProfiles
+  );
   yield* verifyProjectSnapshot(snapshot, toolchain.tsgoExecutable);
-  return makeReport(runs, findings, snapshot.target, toolchain.versions);
+  return makeReport(
+    runs,
+    applied.findings,
+    applied.applicability,
+    snapshot.target,
+    toolchain.versions
+  );
 });
 
 export const scanProject = (

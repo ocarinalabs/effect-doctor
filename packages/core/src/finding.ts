@@ -40,6 +40,7 @@ export const ProjectRelativePathSchema = Schema.NonEmptyString.pipe(
     )
   )
 );
+export type ProjectRelativePath = typeof ProjectRelativePathSchema.Type;
 
 const SourceSpanWire = Schema.Struct({
   end: PositionSchema,

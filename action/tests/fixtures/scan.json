@@ -2,6 +2,29 @@
   "schema": "effect-doctor/scan/v1",
   "kind": "scan",
   "doctorVersion": "0.1.0",
+  "policy": {
+    "activeRuleCount": 150,
+    "digest": "4f6f047d4fb5b1c85f623439f0836bf1c2268bcd1377afbfb75eae74b15f91bb",
+    "id": "effect-v4/default",
+    "revision": 1
+  },
+  "applicability": {
+    "files": [
+      {
+        "directEffectModuleReference": true,
+        "file": "src/log.ts"
+      },
+      {
+        "directEffectModuleReference": true,
+        "file": "src/program.ts"
+      }
+    ],
+    "normalizedDiagnosticCount": 3,
+    "notApplicable": {
+      "groups": [],
+      "total": 0
+    }
+  },
   "target": {
     "entry": "tsconfig.json",
     "projects": ["tsconfig.json"]

@@ -20,6 +20,28 @@ test("a Comparison Report selects introduced and resolved Findings", () => {
   const parsed = parseDoctorReport(fixture("comparison"));
   assert.equal(parsed.findings[0].fingerprint, "introduced");
   assert.equal(parsed.resolved[0].fingerprint, "resolved");
+  assert.equal(parsed.policy.activeRuleCount, 150);
+  assert.equal(parsed.applicability.normalizedDiagnosticCount, 1);
+});
+
+test("a Comparison Report cannot mix scan policies", () => {
+  const report = JSON.parse(fixture("comparison"));
+  report.candidate.policy.digest = "0".repeat(64);
+
+  assert.throws(
+    () => parseDoctorReport(JSON.stringify(report)),
+    /different scan policies/u
+  );
+});
+
+test("an applicability receipt must reconcile with its scan", () => {
+  const report = JSON.parse(fixture("scan"));
+  report.applicability.normalizedDiagnosticCount = 4;
+
+  assert.throws(
+    () => parseDoctorReport(JSON.stringify(report)),
+    /invalid applicability receipt/u
+  );
 });
 
 test("a Comparison Report cannot mix project targets", () => {
@@ -84,11 +106,14 @@ test("summary exposes Findings without inventing a score", () => {
     directory: ".",
     doctorVersion: "0.1.0",
     findings: parsed.findings,
+    applicability: parsed.applicability,
     metrics,
+    policy: parsed.policy,
     scope: "changed",
     target: parsed.target,
   });
   assert.match(summary, /1 finding across 1 file/u);
+  assert.match(summary, /150 active rules/u);
   assert.match(summary, /effect-doctor\/no-run-sync-on-suspending-effect/u);
   assert.doesNotMatch(summary, /score/iu);
 });

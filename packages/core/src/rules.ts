@@ -3,8 +3,10 @@ import { GENERATED_RULE_CATALOG } from "./generated/rule-catalog.js";
 
 export type RuleSource = "effect-tsgo" | "effect-oxlint" | "effect-doctor";
 export type RuleStatus = "blocking" | "advisory";
+export type RuleApplicability = "always" | "direct-effect-module";
 
 export type RuleMetadata = {
+  readonly applicability: RuleApplicability;
   readonly id: string;
   readonly nativeRuleId: string;
   readonly title: string;
@@ -70,6 +72,7 @@ export const tsgoDiagnosticSeverity: Readonly<
 
 export const knownRules = (): readonly RuleMetadata[] =>
   RULE_CATALOG.map((rule): RuleMetadata => ({
+    applicability: rule.applicability,
     category: rule.category,
     defaultSeverity: rule.defaultSeverity,
     description: rule.description,

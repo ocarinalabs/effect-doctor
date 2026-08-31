@@ -212,6 +212,94 @@ describe("scanProject", () => {
     ).toBe(1);
   }, 30_000);
 
+  it("accounts for broad diagnostics without hiding specialized Effect defects", async () => {
+    const workspace = copyFixture("clean", "applicability-");
+    writeFileSync(
+      join(workspace.root, "src", "plain.ts"),
+      [
+        "export const label = (ready: boolean) =>",
+        '  ready ? "ready" : "waiting";',
+        "",
+      ].join("\n")
+    );
+    writeFileSync(
+      join(workspace.root, "src", "effect-module.ts"),
+      [
+        'import { Effect } from "effect";',
+        "",
+        'export const program = Effect.succeed("ready");',
+        "export const label = (ready: boolean) =>",
+        '  ready ? "ready" : "waiting";',
+        "",
+      ].join("\n")
+    );
+    for (const file of ["worker.test.ts", "client.generated.ts"]) {
+      writeFileSync(
+        join(workspace.root, "src", file),
+        [
+          'import { Effect } from "effect";',
+          "",
+          'Effect.succeed("unused");',
+          "",
+        ].join("\n")
+      );
+    }
+
+    try {
+      const report = await Effect.runPromise(
+        scanProject({ root: workspace.root })
+      );
+      const profiles = new Map(
+        report.applicability.files.map((profile) => [profile.file, profile])
+      );
+
+      expect(report.policy).toMatchObject({
+        activeRuleCount: 150,
+        id: "effect-v4/default",
+        revision: 1,
+      });
+      expect(profiles.get("src/plain.ts")).toMatchObject({
+        directEffectModuleReference: false,
+      });
+      expect(profiles.get("src/effect-module.ts")).toMatchObject({
+        directEffectModuleReference: true,
+      });
+      expect(report.applicability.notApplicable.groups).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ ruleId: "effect/no-ternary" }),
+        ])
+      );
+      expect(
+        report.findings.some(
+          (finding) =>
+            finding.location.file === "src/plain.ts" &&
+            finding.ruleId === "effect/no-ternary"
+        )
+      ).toBe(false);
+      expect(
+        report.findings.some(
+          (finding) =>
+            finding.location.file === "src/effect-module.ts" &&
+            finding.ruleId === "effect/no-ternary"
+        )
+      ).toBe(true);
+      for (const file of ["src/worker.test.ts", "src/client.generated.ts"]) {
+        expect(
+          report.findings.some(
+            (finding) =>
+              finding.location.file === file &&
+              finding.ruleId === "effect/floating-effect"
+          )
+        ).toBe(true);
+      }
+      expect(
+        report.findings.length + report.applicability.notApplicable.total
+      ).toBe(report.applicability.normalizedDiagnosticCount);
+    } finally {
+      rmSync(workspace.holder, { force: true, recursive: true });
+    }
+  }, 30_000);
+
   it("combines type-aware and structural Effect diagnostics", async () => {
     const report = await Effect.runPromise(
       scanProject({ root: fixture("invalid") })

@@ -181,6 +181,7 @@ const explain = Command.make(
         `Default severity: ${metadata.defaultSeverity}`,
         `Status: ${metadata.status}`,
         `Category: ${metadata.category}`,
+        `Applicability: ${metadata.applicability}`,
         `Provider fix: ${providerFix(metadata)}`,
         `Description: ${metadata.description}`,
       ].join("\n")
@@ -191,7 +192,7 @@ const explain = Command.make(
 const listRules = Effect.fn("effectDoctor.rules.list")(function* () {
   const lines = knownRules().map(
     (rule) =>
-      `${rule.id}\t${rule.defaultSeverity}\t${rule.status}\t${rule.source}\t${providerFix(rule)}\t${rule.description}`
+      `${rule.id}\t${rule.defaultSeverity}\t${rule.status}\t${rule.applicability}\t${rule.source}\t${providerFix(rule)}\t${rule.description}`
   );
   yield* Console.log(lines.join("\n"));
 });

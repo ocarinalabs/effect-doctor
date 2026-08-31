@@ -35,6 +35,172 @@ const BLOCKING_OXLINT_RULES = new Set([
   "noWidenThenAssert",
 ]);
 
+const ALWAYS_RULE_IDS = new Set([
+  "effect-doctor/consistent-effect-fn-name",
+  "effect-doctor/diagnostic-suppression",
+  "effect-doctor/no-duplicate-layer-factory-call",
+  "effect-doctor/no-inline-schema-compile",
+  "effect-doctor/no-long-lived-layer-acquisition",
+  "effect-doctor/no-manual-sql-transaction",
+  "effect-doctor/no-multiple-callback-resume",
+  "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
+  "effect-doctor/no-network-in-sql-transaction",
+  "effect-doctor/no-run-sync-on-suspending-effect",
+  "effect-doctor/no-throw-in-effect-generator",
+  "effect-doctor/no-unredacted-value-in-diagnostic",
+  "effect-doctor/prefer-abort-signal-passthrough",
+  "effect-doctor/prefer-config-redacted",
+  "effect-doctor/prefer-http-json-response",
+  "effect-doctor/prefer-structured-log-data",
+  "effect/abort-controller-in-effect",
+  "effect/all-of-map-to-for-each",
+  "effect/any-unknown-in-error-context",
+  "effect/catch-all-to-map-error",
+  "effect/catch-chain-to-first-success-of",
+  "effect/catch-conditional-refail-to-catch-if",
+  "effect/catch-die-to-or-die",
+  "effect/catch-tag-to-catch-reason",
+  "effect/catch-to-ignore",
+  "effect/catch-to-or-else-succeed",
+  "effect/catch-unfailable-effect",
+  "effect/class-self-mismatch",
+  "effect/crypto-random-uuidin-effect",
+  "effect/deterministic-keys",
+  "effect/duplicate-package",
+  "effect/effect-do-notation",
+  "effect/effect-fn-iife",
+  "effect/effect-fn-implicit-any",
+  "effect/effect-fn-opportunity",
+  "effect/effect-gen-uses-adapter",
+  "effect/effect-in-failure",
+  "effect/effect-in-void-success",
+  "effect/effect-map-flatten",
+  "effect/effect-map-void",
+  "effect/effect-succeed-with-void",
+  "effect/flat-map-to-map",
+  "effect/floating-effect",
+  "effect/floating-effect-in-vitest",
+  "effect/global-console-in-effect",
+  "effect/global-date-in-effect",
+  "effect/global-error-in-effect-catch",
+  "effect/global-error-in-effect-failure",
+  "effect/global-fetch-in-effect",
+  "effect/global-random-in-effect",
+  "effect/global-timers-in-effect",
+  "effect/instance-of-schema",
+  "effect/layer-merge-all-with-dependencies",
+  "effect/lazy-effect",
+  "effect/lazy-promise-in-effect-sync",
+  "effect/leaking-requirements",
+  "effect/map-some-to-as-some",
+  "effect/missing-effect-context",
+  "effect/missing-effect-error",
+  "effect/missing-layer-context",
+  "effect/missing-return-yield-star",
+  "effect/missing-star-in-yield-effect-gen",
+  "effect/multiple-catch-tag",
+  "effect/multiple-effect-provide",
+  "effect/nested-effect-gen-yield",
+  "effect/new-schema-class",
+  "effect/no-chained-type-assertions",
+  "effect/no-effect-bind",
+  "effect/no-effect-do",
+  "effect/no-inline-provide",
+  "effect/no-managed-runtime-in-effect",
+  "effect/no-module-mocks",
+  "effect/no-nested-effect-gen",
+  "effect/no-per-call-cache-construction",
+  "effect/no-run-collect-on-unbounded-stream",
+  "effect/no-sequential-effect-all",
+  "effect/no-silent-catch-all",
+  "effect/no-test-lifecycle-hooks",
+  "effect/no-unbounded-concurrency",
+  "effect/no-unbounded-retry",
+  "effect/no-widen-then-assert",
+  "effect/outdated-api",
+  "effect/overridden-schema-constructor",
+  "effect/prefer-catch-tag",
+  "effect/prefer-effect-fn",
+  "effect/prefer-match-tags-exhaustive",
+  "effect/prefer-predicate-is-tagged",
+  "effect/prefer-schema-type-property",
+  "effect/prefer-service-of",
+  "effect/prefer-typed-schema-decoder",
+  "effect/prefer-unsafe-constructor",
+  "effect/process-env-in-effect",
+  "effect/promise-in-effect-success",
+  "effect/redundant-map-error",
+  "effect/redundant-or-die",
+  "effect/redundant-schema-tag-identifier",
+  "effect/require-named-effect-fn",
+  "effect/return-effect-in-gen",
+  "effect/run-effect-inside-effect",
+  "effect/schema-literal-non-finite",
+  "effect/schema-number",
+  "effect/schema-opaque-instance-member",
+  "effect/schema-struct-with-tag",
+  "effect/schema-sync-in-effect",
+  "effect/service-not-as-class",
+  "effect/strict-effect-provide",
+  "effect/sync-to-succeed",
+  "effect/try-catch-in-effect-gen",
+  "effect/unknown-in-effect-catch",
+  "effect/unnecessary-effect-gen",
+  "effect/unnecessary-fail-yieldable-error",
+  "effect/unnecessary-pipe",
+  "effect/unnecessary-pipe-chain",
+  "effect/unsafe-effect-type-assertion",
+]);
+
+const DIRECT_EFFECT_MODULE_RULE_IDS = new Set([
+  "effect/async-function",
+  "effect/crypto-random-uuid",
+  "effect/extends-native-error",
+  "effect/global-console",
+  "effect/global-date",
+  "effect/global-fetch",
+  "effect/global-random",
+  "effect/global-timers",
+  "effect/missed-pipeable-opportunity",
+  "effect/missing-pipeable-signature",
+  "effect/new-promise",
+  "effect/no-as",
+  "effect/no-async-function",
+  "effect/no-conditional-empty-object-spread",
+  "effect/no-dynamic-imports",
+  "effect/no-globals",
+  "effect/no-known-value-widening",
+  "effect/no-new-error",
+  "effect/no-new-promise",
+  "effect/no-node-builtin-import",
+  "effect/no-nullish",
+  "effect/no-object-parameters",
+  "effect/no-runtime-typeof",
+  "effect/no-shape-in-symbol-names",
+  "effect/no-ternary",
+  "effect/no-throw-statement",
+  "effect/no-try-catch",
+  "effect/no-unknown-parameters",
+  "effect/no-unknown-type-aliases",
+  "effect/no-unsafe-dictionary-type",
+  "effect/node-builtin-import",
+  "effect/prefer-schema-over-json",
+  "effect/process-env",
+  "effect/strict-boolean-expressions",
+  "effect/unnecessary-arrow-block",
+  "effect/unnecessary-typeof-type",
+]);
+
+const ruleApplicability = (id) => {
+  if (ALWAYS_RULE_IDS.has(id)) {
+    return "always";
+  }
+  if (DIRECT_EFFECT_MODULE_RULE_IDS.has(id)) {
+    return "direct-effect-module";
+  }
+  throw new Error(`Rule ${id} has no explicit applicability family`);
+};
+
 const normalizeCategory = (group) =>
   group === "effectNative" ? "effect-native" : group;
 
@@ -489,6 +655,18 @@ const sortEntries = (entries) =>
       compareCodeUnits(left.source, right.source)
   );
 
+const makeEntries = (metadata) =>
+  sortEntries(
+    [
+      ...makeTsgoEntries(metadata),
+      ...makeOxlintEntries(),
+      ...makeDoctorEntries(),
+    ].map((entry) => ({
+      ...entry,
+      applicability: ruleApplicability(entry.id),
+    }))
+  );
+
 const assertCount = (label, actual, expected) => {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}`);
@@ -535,6 +713,30 @@ const assertUniqueDiagnosticRuleIds = (entries) => {
   }
 };
 
+const assertApplicabilityPolicy = (entries) => {
+  const catalogIds = entries.map((entry) => entry.id).sort(compareCodeUnits);
+  const policyIds = [...ALWAYS_RULE_IDS, ...DIRECT_EFFECT_MODULE_RULE_IDS].sort(
+    compareCodeUnits
+  );
+  if (JSON.stringify(catalogIds) !== JSON.stringify(policyIds)) {
+    throw new Error(
+      "Every canonical rule must have exactly one explicit applicability family"
+    );
+  }
+  assertCount("active rules", entries.length, 150);
+  assertDistribution(
+    entries,
+    "applicability",
+    { always: 114, "direct-effect-module": 36 },
+    "applicability"
+  );
+  const blocking = entries.filter((entry) => entry.status === "blocking");
+  assertCount("blocking rules", blocking.length, 19);
+  if (blocking.some((entry) => entry.applicability !== "always")) {
+    throw new Error("Every blocking rule must always apply");
+  }
+};
+
 const assertCatalog = (entries) => {
   assertProviderCounts(entries);
   assertUniqueCanonicalIds(entries);
@@ -563,6 +765,7 @@ const assertCatalog = (entries) => {
     41
   );
   assertUniqueDiagnosticRuleIds(entries);
+  assertApplicabilityPolicy(entries);
 };
 
 const render = (entries) =>
@@ -674,11 +877,7 @@ const verifyInstalledProviders = (entries) => {
 
 const metadata = readMetadata();
 if (args.has("--write")) {
-  const entries = sortEntries([
-    ...makeTsgoEntries(metadata),
-    ...makeOxlintEntries(),
-    ...makeDoctorEntries(),
-  ]);
+  const entries = makeEntries(metadata);
   assertCatalog(entries);
   verifyInstalledProviders(entries);
   mkdirSync(dirname(outputPath), { recursive: true });
@@ -688,11 +887,7 @@ if (args.has("--write")) {
   const entries = parseGenerated();
   assertCatalog(entries);
   verifyInstalledProviders(entries);
-  const expected = sortEntries([
-    ...makeTsgoEntries(metadata),
-    ...makeOxlintEntries(),
-    ...makeDoctorEntries(),
-  ]);
+  const expected = makeEntries(metadata);
   if (render(entries) !== render(expected)) {
     throw new Error("Generated catalog differs from pinned reference metadata");
   }

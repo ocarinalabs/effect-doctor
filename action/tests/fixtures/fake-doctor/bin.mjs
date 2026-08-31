@@ -31,10 +31,28 @@ if (process.env.EFFECT_DOCTOR_TEST_FAIL === "1") {
 }
 
 const target = { entry, projects: [entry] };
+const policy = {
+  activeRuleCount: 150,
+  digest: "4f6f047d4fb5b1c85f623439f0836bf1c2268bcd1377afbfb75eae74b15f91bb",
+  id: "effect-v4/default",
+  revision: 1,
+};
+const applicability = {
+  files: [
+    {
+      directEffectModuleReference: false,
+      file: "src/main.ts",
+    },
+  ],
+  normalizedDiagnosticCount: 0,
+  notApplicable: { groups: [], total: 0 },
+};
 const scan = {
+  applicability,
   doctorVersion: "0.1.0",
   findings: [],
   kind: "scan",
+  policy,
   schema: "effect-doctor/scan/v1",
   target,
 };

@@ -1,5 +1,9 @@
 import { Schema } from "effect";
 
+import {
+  ApplicabilityReportSchema,
+  decideRuleApplicability,
+} from "./applicability.js";
 import { compareFindings } from "./delta.js";
 import {
   AnalyzerRunSchema,
@@ -11,6 +15,9 @@ import type { Finding, Severity } from "./finding.js";
 import { fingerprintFinding } from "./fingerprint.js";
 import { compareFindingOrder } from "./internal/finding-order.js";
 import { compareCodeUnits } from "./internal/order.js";
+import { ScanPolicySchema } from "./policy.js";
+import type { ScanPolicy } from "./policy.js";
+import { knownRules } from "./rules.js";
 
 const ScanTargetWire = Schema.Struct({
   entry: ProjectRelativePathSchema,
@@ -36,10 +43,12 @@ const ScanTargetSchema = ScanTargetWire.check(
 export type ScanTarget = typeof ScanTargetSchema.Type;
 
 const ScanReportWire = Schema.Struct({
+  applicability: ApplicabilityReportSchema,
   doctorVersion: Schema.NonEmptyString,
   engines: Schema.Array(AnalyzerRunSchema),
   findings: Schema.Array(FindingSchema),
   kind: Schema.Literal("scan"),
+  policy: ScanPolicySchema,
   root: Schema.Literal("."),
   schema: Schema.Literal("effect-doctor/scan/v1"),
   summary: FindingSummarySchema,
@@ -147,10 +156,79 @@ const summaryIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   return ["Scan summary must match emitted Findings"];
 };
 
+const applicabilityIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
+  const issues: Schema.FilterIssue[] = [];
+  const inventory = report.engines.at(0)?.analyzedFiles ?? [];
+  const profiles = report.applicability.files;
+  const profileFiles = profiles.map((profile) => profile.file);
+  if (!sameStrings(inventory, profileFiles)) {
+    issues.push(
+      "Applicability profiles must match the Analyzer Run inventory exactly"
+    );
+  }
+
+  const { groups } = report.applicability.notApplicable;
+  const groupRuleIds = groups.map((group) => group.ruleId);
+  if (
+    new Set(groupRuleIds).size !== groupRuleIds.length ||
+    !isOrdered(groupRuleIds, compareCodeUnits)
+  ) {
+    issues.push("Not-applicable groups must be unique and canonically ordered");
+  }
+  const groupedTotal = groups.reduce((total, group) => total + group.count, 0);
+  if (groupedTotal !== report.applicability.notApplicable.total) {
+    issues.push("Not-applicable group counts must equal their total");
+  }
+  if (
+    report.findings.length + report.applicability.notApplicable.total !==
+    report.applicability.normalizedDiagnosticCount
+  ) {
+    issues.push(
+      "Applicable and not-applicable diagnostics must equal the normalized diagnostic count"
+    );
+  }
+
+  const rules = new Map(knownRules().map((rule) => [rule.id, rule]));
+  const sourceByFile = new Map(
+    profiles.map((profile) => [profile.file, profile])
+  );
+  if (
+    report.findings.some((finding) => {
+      const rule = rules.get(finding.ruleId);
+      const source = sourceByFile.get(finding.location.file);
+      return (
+        rule === undefined ||
+        source === undefined ||
+        !decideRuleApplicability(rule, source).applicable
+      );
+    })
+  ) {
+    issues.push("Every emitted Finding must satisfy its rule applicability");
+  }
+  if (
+    groups.some(
+      (group) =>
+        rules.get(group.ruleId)?.applicability !== "direct-effect-module"
+    )
+  ) {
+    issues.push("Not-applicable groups must name direct-Effect-module rules");
+  }
+  if (
+    groups.length > 0 &&
+    profiles.every((profile) => profile.directEffectModuleReference)
+  ) {
+    issues.push(
+      "Not-applicable diagnostics require a source without a direct Effect module reference"
+    );
+  }
+  return issues;
+};
+
 export const ScanReportSchema = ScanReportWire.check(
   Schema.makeFilter((report) => [
     ...analyzerRunIssues(report),
     ...findingIssues(report),
+    ...applicabilityIssues(report),
     ...versionIssues(report),
     ...summaryIssues(report),
   ])
@@ -218,6 +296,19 @@ const comparisonTargetIssues = (
     ? []
     : ["Comparison scan targets must use the same entry project"];
 
+const samePolicy = (left: ScanPolicy, right: ScanPolicy): boolean =>
+  left.activeRuleCount === right.activeRuleCount &&
+  left.digest === right.digest &&
+  left.id === right.id &&
+  left.revision === right.revision;
+
+const comparisonPolicyIssues = (
+  report: ComparisonReportWire
+): Schema.FilterIssue[] =>
+  samePolicy(report.baseline.policy, report.candidate.policy)
+    ? []
+    : ["Comparison scan policies must agree"];
+
 const comparisonDeltaIssues = (
   report: ComparisonReportWire
 ): Schema.FilterIssue[] => {
@@ -238,6 +329,7 @@ const comparisonDeltaIssues = (
 export const ComparisonReportSchema = ComparisonReportWire.check(
   Schema.makeFilter((report) => [
     ...comparisonVersionIssues(report),
+    ...comparisonPolicyIssues(report),
     ...comparisonTargetIssues(report),
     ...comparisonDeltaIssues(report),
   ])

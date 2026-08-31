@@ -85,14 +85,27 @@ const executeRerun = (
 describe("Effect Doctor CLI", () => {
   it("returns one when a finding crosses the blocking threshold", () => {
     const result = runCli(fixture("invalid"));
+    const report = JSON.parse(result.stdout);
 
     expect(result.status).toBe(1);
-    expect(JSON.parse(result.stdout)).toEqual(
+    expect(report).toEqual(
       expect.objectContaining({
+        applicability: expect.objectContaining({
+          normalizedDiagnosticCount: expect.any(Number),
+          notApplicable: expect.objectContaining({ total: expect.any(Number) }),
+        }),
+        policy: expect.objectContaining({
+          activeRuleCount: 150,
+          id: "effect-v4/default",
+          revision: 1,
+        }),
         schema: "effect-doctor/scan/v1",
         summary: expect.objectContaining({ errors: 2 }),
       })
     );
+    expect(
+      report.findings.length + report.applicability.notApplicable.total
+    ).toBe(report.applicability.normalizedDiagnosticCount);
   }, 30_000);
 
   it("does not expose project paths or compiler stderr in failure JSON", () => {
@@ -129,6 +142,7 @@ describe("Effect Doctor CLI", () => {
       expect.arrayContaining([
         expect.stringMatching(/^Status: /u),
         expect.stringMatching(/^Category: /u),
+        expect.stringMatching(/^Applicability: /u),
         expect.stringMatching(/^Provider fix: /u),
         expect.stringMatching(/^Description: /u),
       ])
@@ -165,6 +179,13 @@ describe("Effect Doctor CLI", () => {
         expect(result.status).toBe(0);
         expect(result.stdout).toContain(
           "Effect Doctor agent handoff (Effect v4)"
+        );
+        expect(result.stdout).toContain("150 active rules");
+        expect(result.stdout).toContain("diagnostics not applicable");
+        expect(result.stdout).toContain("Project: --config.json");
+        expect(result.stdout).toContain("Scan receipt:");
+        expect(result.stdout).toMatch(
+          /Policy: effect-v4\/default@1 [a-f0-9]{64}/u
         );
         expect(result.stdout).toContain("Do not suppress rules");
         expect(result.stdout).toMatch(/Fingerprint: [a-f0-9]{64}/u);
@@ -206,6 +227,11 @@ describe("Effect Doctor CLI", () => {
         ]);
 
         expect(result.status).toBe(0);
+        expect(result.stdout).toContain("Project: tsconfig.json");
+        expect(result.stdout).toContain("Introduced findings: 0");
+        expect(result.stdout).toMatch(
+          /Candidate receipt: 150 active rules; [1-9]\d* applicable findings;/u
+        );
         expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual([
           "compare",
           baseline,

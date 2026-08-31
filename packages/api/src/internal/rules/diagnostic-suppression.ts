@@ -1,7 +1,10 @@
 import { defineRule } from "@oxlint/plugins";
-import type { Comment, Context } from "@oxlint/plugins";
+import type { Comment, Context, ESTree } from "@oxlint/plugins";
 
-import { INTEGRITY_VISIT_MESSAGE } from "./diagnostic-suppression-contract.ts";
+import {
+  DIRECT_EFFECT_REFERENCE_VISIT_MESSAGE,
+  INTEGRITY_VISIT_MESSAGE,
+} from "./diagnostic-suppression-contract.ts";
 
 const DIRECTIVE_LINE =
   /^(?<prefix>\s*(?:\*\s*)?)(?<directive>(?:@effect-diagnostics(?:-next-line)?|@ts-(?:expect-error|ignore|nocheck)|(?:eslint-disable|oxlint(?:-|_)disable)(?:-line|-next-line)?|biome-ignore)\b.*)$/u;
@@ -62,6 +65,11 @@ const reportCommentSuppressions = (
   }
 };
 
+const isEffectModuleSpecifier = (specifier: string): boolean =>
+  specifier === "effect" ||
+  specifier.startsWith("effect/") ||
+  specifier.startsWith("@effect/");
+
 export const diagnosticSuppressionIntegrity = defineRule({
   meta: {
     docs: {
@@ -70,12 +78,50 @@ export const diagnosticSuppressionIntegrity = defineRule({
     type: "suggestion",
   },
   createOnce(context) {
+    let directEffectModuleReference = false;
+
+    const recordModuleSpecifier = (source: ESTree.StringLiteral): void => {
+      if (isEffectModuleSpecifier(source.value)) {
+        directEffectModuleReference = true;
+      }
+    };
+
     return {
-      Program(node) {
-        context.report({ message: INTEGRITY_VISIT_MESSAGE, node });
+      Program() {
+        directEffectModuleReference = false;
         for (const comment of context.sourceCode.getAllComments()) {
           reportCommentSuppressions(context, comment);
         }
+      },
+      "Program:exit"(node) {
+        context.report({
+          message: directEffectModuleReference
+            ? DIRECT_EFFECT_REFERENCE_VISIT_MESSAGE
+            : INTEGRITY_VISIT_MESSAGE,
+          node,
+        });
+      },
+      ImportDeclaration(node) {
+        recordModuleSpecifier(node.source);
+      },
+      ExportAllDeclaration(node) {
+        recordModuleSpecifier(node.source);
+      },
+      ExportNamedDeclaration(node) {
+        if (node.source !== null) {
+          recordModuleSpecifier(node.source);
+        }
+      },
+      ImportExpression(node) {
+        if (
+          node.source.type === "Literal" &&
+          typeof node.source.value === "string"
+        ) {
+          recordModuleSpecifier(node.source);
+        }
+      },
+      TSImportType(node) {
+        recordModuleSpecifier(node.source);
       },
     };
   },

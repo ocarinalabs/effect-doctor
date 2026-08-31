@@ -16,7 +16,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/consistent-effect-fn-name",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "Consistent Effect Fn Name"
+    "title": "Consistent Effect Fn Name",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -37,7 +38,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/__diagnostic-suppression-integrity",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "Diagnostic Suppression"
+    "title": "Diagnostic Suppression",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -55,7 +57,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-duplicate-layer-factory-call",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Duplicate Layer Factory Call"
+    "title": "No Duplicate Layer Factory Call",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -73,7 +76,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-inline-schema-compile",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Inline Schema Compile"
+    "title": "No Inline Schema Compile",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -91,7 +95,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-long-lived-layer-acquisition",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Long Lived Layer Acquisition"
+    "title": "No Long Lived Layer Acquisition",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -109,7 +114,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-manual-sql-transaction",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Manual SQL Transaction"
+    "title": "No Manual SQL Transaction",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -127,7 +133,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-multiple-callback-resume",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Multiple Callback Resume"
+    "title": "No Multiple Callback Resume",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -145,7 +152,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Mutation After Unsafe Chunk Wrap"
+    "title": "No Mutation After Unsafe Chunk Wrap",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -163,7 +171,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-network-in-sql-transaction",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Network In SQL Transaction"
+    "title": "No Network In SQL Transaction",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -181,7 +190,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-run-sync-on-suspending-effect",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Run Sync On Suspending Effect"
+    "title": "No Run Sync On Suspending Effect",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -199,7 +209,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-throw-in-effect-generator",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Throw In Effect Generator"
+    "title": "No Throw In Effect Generator",
+    "applicability": "always"
   },
   {
     "category": "security",
@@ -217,7 +228,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/no-unredacted-value-in-diagnostic",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "No Unredacted Value In Diagnostic"
+    "title": "No Unredacted Value In Diagnostic",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -235,7 +247,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/prefer-abort-signal-passthrough",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "Prefer Abort Signal Passthrough"
+    "title": "Prefer Abort Signal Passthrough",
+    "applicability": "always"
   },
   {
     "category": "security",
@@ -253,7 +266,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/prefer-config-redacted",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "Prefer Config Redacted"
+    "title": "Prefer Config Redacted",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -271,7 +285,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/prefer-http-json-response",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "Prefer HTTP JSON Response"
+    "title": "Prefer HTTP JSON Response",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -289,7 +304,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effect-doctor/prefer-structured-log-data",
     "source": "effect-doctor",
     "status": "advisory",
-    "title": "Prefer Structured Log Data"
+    "title": "Prefer Structured Log Data",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -309,7 +325,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "abortControllerInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Abort Controller In Effect"
+    "title": "Abort Controller In Effect",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -329,7 +346,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "allOfMapToForEach",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "All Of Map To For Each"
+    "title": "All Of Map To For Each",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -349,7 +367,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "anyUnknownInErrorContext",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Any Unknown In Error Context"
+    "title": "Any Unknown In Error Context",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -369,7 +388,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "asyncFunction",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Async Function"
+    "title": "Async Function",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "style",
@@ -389,7 +409,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchAllToMapError",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch All To Map Error"
+    "title": "Catch All To Map Error",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -409,7 +430,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchChainToFirstSuccessOf",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch Chain To First Success Of"
+    "title": "Catch Chain To First Success Of",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -429,7 +451,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchConditionalRefailToCatchIf",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch Conditional Refail To Catch If"
+    "title": "Catch Conditional Refail To Catch If",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -449,7 +472,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchDieToOrDie",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch Die To Or Die"
+    "title": "Catch Die To Or Die",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -469,7 +493,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchTagToCatchReason",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch Tag To Catch Reason"
+    "title": "Catch Tag To Catch Reason",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -489,7 +514,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchToIgnore",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch To Ignore"
+    "title": "Catch To Ignore",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -509,7 +535,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchToOrElseSucceed",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch To Or Else Succeed"
+    "title": "Catch To Or Else Succeed",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -529,7 +556,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "catchUnfailableEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Catch Unfailable Effect"
+    "title": "Catch Unfailable Effect",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -549,7 +577,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "classSelfMismatch",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Class Self Mismatch"
+    "title": "Class Self Mismatch",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -569,7 +598,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "cryptoRandomUUID",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Crypto Random Uuid"
+    "title": "Crypto Random Uuid",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -589,7 +619,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "cryptoRandomUUIDInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Crypto Random Uuidin Effect"
+    "title": "Crypto Random Uuidin Effect",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -609,7 +640,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "deterministicKeys",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Deterministic Keys"
+    "title": "Deterministic Keys",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -629,7 +661,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "duplicatePackage",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Duplicate Package"
+    "title": "Duplicate Package",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -649,7 +682,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectDoNotation",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Do Notation"
+    "title": "Effect Do Notation",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -669,7 +703,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectFnIife",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Fn Iife"
+    "title": "Effect Fn Iife",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -689,7 +724,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectFnImplicitAny",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Effect Fn Implicit Any"
+    "title": "Effect Fn Implicit Any",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -709,7 +745,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectFnOpportunity",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Fn Opportunity"
+    "title": "Effect Fn Opportunity",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -729,7 +766,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectGenUsesAdapter",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Gen Uses Adapter"
+    "title": "Effect Gen Uses Adapter",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -749,7 +787,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectInFailure",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect In Failure"
+    "title": "Effect In Failure",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -769,7 +808,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectInVoidSuccess",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect In Void Success"
+    "title": "Effect In Void Success",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -789,7 +829,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectMapFlatten",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Map Flatten"
+    "title": "Effect Map Flatten",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -809,7 +850,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectMapVoid",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Map Void"
+    "title": "Effect Map Void",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -829,7 +871,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "effectSucceedWithVoid",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Effect Succeed With Void"
+    "title": "Effect Succeed With Void",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -849,7 +892,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "extendsNativeError",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Extends Native Error"
+    "title": "Extends Native Error",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "style",
@@ -869,7 +913,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "flatMapToMap",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Flat Map To Map"
+    "title": "Flat Map To Map",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -890,7 +935,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "floatingEffect",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Floating Effect"
+    "title": "Floating Effect",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -910,7 +956,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "floatingEffectInVitest",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Floating Effect In Vitest"
+    "title": "Floating Effect In Vitest",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -930,7 +977,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalConsole",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Console"
+    "title": "Global Console",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -950,7 +998,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalConsoleInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Console In Effect"
+    "title": "Global Console In Effect",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -971,7 +1020,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalDate",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Date"
+    "title": "Global Date",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -992,7 +1042,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalDateInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Date In Effect"
+    "title": "Global Date In Effect",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1012,7 +1063,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalErrorInEffectCatch",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Error In Effect Catch"
+    "title": "Global Error In Effect Catch",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1032,7 +1084,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalErrorInEffectFailure",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Error In Effect Failure"
+    "title": "Global Error In Effect Failure",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -1052,7 +1105,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalFetch",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Fetch"
+    "title": "Global Fetch",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -1072,7 +1126,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalFetchInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Fetch In Effect"
+    "title": "Global Fetch In Effect",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -1092,7 +1147,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalRandom",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Random"
+    "title": "Global Random",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -1112,7 +1168,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalRandomInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Random In Effect"
+    "title": "Global Random In Effect",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -1132,7 +1189,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalTimers",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Timers"
+    "title": "Global Timers",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -1152,7 +1210,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "globalTimersInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Global Timers In Effect"
+    "title": "Global Timers In Effect",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -1172,7 +1231,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "instanceOfSchema",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Instance Of Schema"
+    "title": "Instance Of Schema",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1192,7 +1252,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "layerMergeAllWithDependencies",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Layer Merge All With Dependencies"
+    "title": "Layer Merge All With Dependencies",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1212,7 +1273,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "lazyEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Lazy Effect"
+    "title": "Lazy Effect",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1232,7 +1294,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "lazyPromiseInEffectSync",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Lazy Promise In Effect Sync"
+    "title": "Lazy Promise In Effect Sync",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1252,7 +1315,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "leakingRequirements",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Leaking Requirements"
+    "title": "Leaking Requirements",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -1272,7 +1336,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "mapSomeToAsSome",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Map Some To As Some"
+    "title": "Map Some To As Some",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -1292,7 +1357,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missedPipeableOpportunity",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Missed Pipeable Opportunity"
+    "title": "Missed Pipeable Opportunity",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -1312,7 +1378,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missingEffectContext",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Missing Effect Context"
+    "title": "Missing Effect Context",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -1332,7 +1399,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missingEffectError",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Missing Effect Error"
+    "title": "Missing Effect Error",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -1352,7 +1420,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missingLayerContext",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Missing Layer Context"
+    "title": "Missing Layer Context",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -1372,7 +1441,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missingPipeableSignature",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Missing Pipeable Signature"
+    "title": "Missing Pipeable Signature",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -1392,7 +1462,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missingReturnYieldStar",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Missing Return Yield Star"
+    "title": "Missing Return Yield Star",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -1413,7 +1484,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "missingStarInYieldEffectGen",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Missing Star In Yield Effect Gen"
+    "title": "Missing Star In Yield Effect Gen",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -1433,7 +1505,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "multipleCatchTag",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Multiple Catch Tag"
+    "title": "Multiple Catch Tag",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1453,7 +1526,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "multipleEffectProvide",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Multiple Effect Provide"
+    "title": "Multiple Effect Provide",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -1473,7 +1547,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "nestedEffectGenYield",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Nested Effect Gen Yield"
+    "title": "Nested Effect Gen Yield",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -1493,7 +1568,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "newPromise",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "New Promise"
+    "title": "New Promise",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "style",
@@ -1513,7 +1589,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "newSchemaClass",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "New Schema Class"
+    "title": "New Schema Class",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1531,7 +1608,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No As",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1549,7 +1627,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Async Function",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -1567,7 +1646,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Chained Type Assertions",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1585,7 +1665,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Conditional Empty Object Spread",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1603,7 +1684,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Dynamic Imports",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1621,7 +1703,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Effect Bind",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1639,7 +1722,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Effect Do",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1657,7 +1741,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Globals",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1675,7 +1760,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Inline Provide",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -1693,7 +1779,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Known Value Widening",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "resource-safety",
@@ -1711,7 +1798,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Managed Runtime In Effect",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1729,7 +1817,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Module Mocks",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1747,7 +1836,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Nested Effect Gen",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1765,7 +1855,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No New Error",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1783,7 +1874,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No New Promise",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1801,7 +1893,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Node Builtin Import",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1819,7 +1912,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Nullish",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -1837,7 +1931,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Object Parameters",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "resource-safety",
@@ -1855,7 +1950,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Per Call Cache Construction",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -1873,7 +1969,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Run Collect On Unbounded Stream",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1891,7 +1988,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Runtime Typeof",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1909,7 +2007,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Sequential Effect All",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1927,7 +2026,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Shape In Symbol Names",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1945,7 +2045,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Silent Catch All",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1963,7 +2064,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Ternary",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -1981,7 +2083,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Test Lifecycle Hooks",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -1999,7 +2102,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Throw Statement",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -2017,7 +2121,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Try Catch",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "resource-safety",
@@ -2035,7 +2140,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Unbounded Concurrency",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "resource-safety",
@@ -2053,7 +2159,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Unbounded Retry",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -2071,7 +2178,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Unknown Parameters",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -2089,7 +2197,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Unknown Type Aliases",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -2107,7 +2216,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Unsafe Dictionary Type",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -2125,7 +2235,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "No Widen Then Assert",
     "defaultSeverity": "error",
-    "status": "blocking"
+    "status": "blocking",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -2145,7 +2256,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "nodeBuiltinImport",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Node Builtin Import"
+    "title": "Node Builtin Import",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "correctness",
@@ -2166,7 +2278,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "outdatedApi",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Outdated Api"
+    "title": "Outdated Api",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -2186,7 +2299,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "overriddenSchemaConstructor",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Overridden Schema Constructor"
+    "title": "Overridden Schema Constructor",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2204,7 +2318,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "Prefer Catch Tag",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2222,7 +2337,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "Prefer Effect Fn",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2240,7 +2356,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "Prefer Match Tags Exhaustive",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2258,7 +2375,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "Prefer Predicate Is Tagged",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -2278,7 +2396,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "preferSchemaOverJson",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Prefer Schema Over Json"
+    "title": "Prefer Schema Over Json",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "style",
@@ -2298,7 +2417,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "preferSchemaTypeProperty",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Prefer Schema Type Property"
+    "title": "Prefer Schema Type Property",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2316,7 +2436,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "Prefer Service Of",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2336,7 +2457,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "preferTypedSchemaDecoder",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Prefer Typed Schema Decoder"
+    "title": "Prefer Typed Schema Decoder",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2356,7 +2478,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "preferUnsafeConstructor",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Prefer Unsafe Constructor"
+    "title": "Prefer Unsafe Constructor",
+    "applicability": "always"
   },
   {
     "category": "effect-native",
@@ -2376,7 +2499,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "processEnv",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Process Env"
+    "title": "Process Env",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -2396,7 +2520,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "processEnvInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Process Env In Effect"
+    "title": "Process Env In Effect",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -2416,7 +2541,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "promiseInEffectSuccess",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Promise In Effect Success"
+    "title": "Promise In Effect Success",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2437,7 +2563,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "redundantMapError",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Redundant Map Error"
+    "title": "Redundant Map Error",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2458,7 +2585,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "redundantOrDie",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Redundant Or Die"
+    "title": "Redundant Or Die",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2478,7 +2606,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "redundantSchemaTagIdentifier",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Redundant Schema Tag Identifier"
+    "title": "Redundant Schema Tag Identifier",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2496,7 +2625,8 @@ export const GENERATED_RULE_CATALOG = [
     "source": "effect-oxlint",
     "title": "Require Named Effect Fn",
     "defaultSeverity": "advice",
-    "status": "advisory"
+    "status": "advisory",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2516,7 +2646,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "returnEffectInGen",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Return Effect In Gen"
+    "title": "Return Effect In Gen",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2538,7 +2669,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "runEffectInsideEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Run Effect Inside Effect"
+    "title": "Run Effect Inside Effect",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -2558,7 +2690,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "schemaLiteralNonFinite",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Schema Literal Non Finite"
+    "title": "Schema Literal Non Finite",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2578,7 +2711,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "schemaNumber",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Schema Number"
+    "title": "Schema Number",
+    "applicability": "always"
   },
   {
     "category": "correctness",
@@ -2598,7 +2732,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "schemaOpaqueInstanceMember",
     "source": "effect-tsgo",
     "status": "blocking",
-    "title": "Schema Opaque Instance Member"
+    "title": "Schema Opaque Instance Member",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2618,7 +2753,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "schemaStructWithTag",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Schema Struct With Tag"
+    "title": "Schema Struct With Tag",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2638,7 +2774,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "schemaSyncInEffect",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Schema Sync In Effect"
+    "title": "Schema Sync In Effect",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2658,7 +2795,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "serviceNotAsClass",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Service Not As Class"
+    "title": "Service Not As Class",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2678,7 +2816,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "strictBooleanExpressions",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Strict Boolean Expressions"
+    "title": "Strict Boolean Expressions",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "antipattern",
@@ -2698,7 +2837,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "strictEffectProvide",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Strict Effect Provide"
+    "title": "Strict Effect Provide",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2718,7 +2858,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "syncToSucceed",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Sync To Succeed"
+    "title": "Sync To Succeed",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2738,7 +2879,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "tryCatchInEffectGen",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Try Catch In Effect Gen"
+    "title": "Try Catch In Effect Gen",
+    "applicability": "always"
   },
   {
     "category": "antipattern",
@@ -2758,7 +2900,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unknownInEffectCatch",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unknown In Effect Catch"
+    "title": "Unknown In Effect Catch",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2778,7 +2921,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unnecessaryArrowBlock",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unnecessary Arrow Block"
+    "title": "Unnecessary Arrow Block",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "style",
@@ -2798,7 +2942,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unnecessaryEffectGen",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unnecessary Effect Gen"
+    "title": "Unnecessary Effect Gen",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2818,7 +2963,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unnecessaryFailYieldableError",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unnecessary Fail Yieldable Error"
+    "title": "Unnecessary Fail Yieldable Error",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2838,7 +2984,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unnecessaryPipe",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unnecessary Pipe"
+    "title": "Unnecessary Pipe",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2858,7 +3005,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unnecessaryPipeChain",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unnecessary Pipe Chain"
+    "title": "Unnecessary Pipe Chain",
+    "applicability": "always"
   },
   {
     "category": "style",
@@ -2878,7 +3026,8 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unnecessaryTypeofType",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unnecessary Typeof Type"
+    "title": "Unnecessary Typeof Type",
+    "applicability": "direct-effect-module"
   },
   {
     "category": "effect-native",
@@ -2898,6 +3047,7 @@ export const GENERATED_RULE_CATALOG = [
     "providerRuleId": "unsafeEffectTypeAssertion",
     "source": "effect-tsgo",
     "status": "advisory",
-    "title": "Unsafe Effect Type Assertion"
+    "title": "Unsafe Effect Type Assertion",
+    "applicability": "always"
   }
 ] as const;

@@ -1,8 +1,11 @@
 export {
   AnalyzerFailure,
+  ApplicabilityReportSchema,
   ComparisonReportSchema,
   InvalidAnalyzerOutput,
   ProjectFailure,
+  SCAN_POLICY,
+  ScanPolicySchema,
   ScanReportSchema,
   compareFindings,
   compareProjects,
@@ -10,6 +13,7 @@ export {
   scanProject,
 } from "@effect-doctor/api";
 export type {
+  ApplicabilityReport,
   AnalyzerRun,
   CompareRequest,
   ComparisonReport,
@@ -18,6 +22,7 @@ export type {
   FindingDelta,
   FindingSummary,
   RuleMetadata,
+  ScanPolicy,
   ScanReport,
   ScanRequest,
   ScanTarget,
