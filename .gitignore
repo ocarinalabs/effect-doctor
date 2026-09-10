@@ -147,3 +147,7 @@ vite.config.ts.timestamp-*
 CODEX.md
 .turbo/
 .verification/
+
+# Vercel
+.vercel/
+.env.local

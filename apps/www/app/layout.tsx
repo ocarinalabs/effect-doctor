@@ -35,6 +35,7 @@ export default function RootLayout({
               Effect Doctor
             </Link>
             <nav aria-label="Site">
+              <Link href="/docs">Docs</Link>
               <Link href="/rules">Rules</Link>
               <a href="https://github.com/ocarinalabs/effect-doctor">GitHub</a>
             </nav>
