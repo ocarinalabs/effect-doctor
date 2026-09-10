@@ -1,0 +1,59 @@
+{
+  "skill_name": "effect-doctor",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Can you run effect doctor on this repo and tell me what's wrong? Don't change anything yet, I just want the list.",
+      "expected_output": "A report that names the Effect version, the project file, the exact scan command, and every finding with rule id, file, line, and severity. The agent edited no files.",
+      "assertions": [
+        "The scan command uses --format agent",
+        "The report lists each finding with its rule id and a file and line",
+        "The report states the Effect version read from the manifest or lockfile",
+        "The agent modified no source file"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I refactored packages/server/src/db.ts to use Effect.retry and my teammate says it's unbounded. Check it with effect doctor and fix whatever it flags there, then make sure it's clean.",
+      "expected_output": "The scan runs. The agent bounds the retry schedule at the named file. A second scan no longer lists that finding and lists no new ones. The report includes the type check result.",
+      "assertions": [
+        "The response quotes the first scan output with the retry finding's rule id and location",
+        "The fix bounds the retry schedule instead of adding a suppression comment or disabling a rule",
+        "A second scan ran after the fix and the response reports its result",
+        "The repository type check ran after the fix"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "run the doctor thing on ./legacy-service",
+      "expected_output": "The agent reads legacy-service's manifest, finds it depends on effect 3.x, and reports that Effect Doctor covers Effect v4 only, without running a scan or calling the project healthy.",
+      "assertions": [
+        "The agent checked the effect version before running a scan",
+        "The response says the skill covers Effect v4 only",
+        "The response does not describe the project as passing or clean"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "effect doctor flagged effect-doctor/no-long-lived-layer-acquisition in src/cache.ts:31 but that layer is supposed to live for the whole app. Is this a real problem or can I turn the rule off?",
+      "expected_output": "The agent runs rules explain for the rule and quotes its description and category. It reads src/cache.ts at the location and states whether the code matches the contract the rule protects. It explains that the rule set is fixed, so an intentional violation stays open in the report. It adds no suppression comment.",
+      "assertions": [
+        "The agent ran rules explain with the exact rule id and quoted its output",
+        "The agent read the code at the named location before answering",
+        "The response says rules cannot be turned off and does not add a suppression comment",
+        "The response states a clear verdict on whether the code violates the rule's contract"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "compare my branch against main with effect doctor and fix only what I introduced; leave the old warnings alone",
+      "expected_output": "The agent prepares a baseline checkout of main with its packages installed and runs the compare command with --format agent. It fixes only the introduced findings, reruns the comparison, and reports the introduced and resolved counts before and after.",
+      "assertions": [
+        "The compare command names a baseline checkout of main and the candidate",
+        "The agent changed only findings listed as introduced",
+        "The comparison ran again after the fixes",
+        "The agent left pre-existing findings untouched and the report says so"
+      ]
+    }
+  ]
+}
