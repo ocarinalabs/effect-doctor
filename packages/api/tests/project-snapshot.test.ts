@@ -19,8 +19,8 @@ import { describe, expect, it } from "vitest";
 import {
   makeProjectSnapshot,
   verifyProjectSnapshot,
-} from "../src/internal/project-snapshot.js";
-import { resolveToolchain } from "../src/internal/toolchain.js";
+} from "../src/internal/project/snapshot.js";
+import { resolveToolchain } from "../src/internal/project/toolchain.js";
 
 const fixture = (name: "clean" | "solution") =>
   fileURLToPath(new URL(`fixtures/${name}`, import.meta.url));
@@ -47,7 +47,7 @@ const runWithNode = <A, E>(
 describe("ProjectSnapshot final verification", () => {
   it("rejects a source added after the initial project plan", () =>
     withWorkspace(async (root) => {
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -67,7 +67,7 @@ describe("ProjectSnapshot final verification", () => {
 
   it("rejects a source removed after the initial project plan", () =>
     withWorkspace(async (root) => {
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -85,7 +85,7 @@ describe("ProjectSnapshot final verification", () => {
   it("rejects tsconfig changes that preserve the file inventory", () =>
     withWorkspace(async (root) => {
       const tsconfig = join(root, "tsconfig.json");
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -115,7 +115,7 @@ describe("ProjectSnapshot final verification", () => {
           include: ["src/**/*.ts"],
         })
       );
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -137,7 +137,7 @@ describe("ProjectSnapshot final verification", () => {
     withWorkspace(async (root) => {
       const tsconfig = join(root, "tsconfig.json");
       const referenced = join(root, "packages", "shared", "tsconfig.json");
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -161,7 +161,7 @@ describe("ProjectSnapshot final verification", () => {
       const replacement = join(root, "replacement.json");
       cpSync(join(root, "tsconfig.json"), replacement);
       symlinkSync("tsconfig.json", alias);
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -181,6 +181,37 @@ describe("ProjectSnapshot final verification", () => {
     }));
 });
 
+describe("ProjectSnapshot planning failures", () => {
+  it("names the compiler failure without repeating project paths", () =>
+    withWorkspace(async (root) => {
+      const tsconfig = join(root, "tsconfig.json");
+      writeFileSync(
+        tsconfig,
+        JSON.stringify({
+          compilerOptions: {},
+          files: ["src/effectDoctorMissingSource.ts"],
+        })
+      );
+      const toolchain = await runWithNode(resolveToolchain());
+
+      const failure = await runWithNode(
+        makeProjectSnapshot(
+          root,
+          { entry: "tsconfig.json", tsconfig },
+          toolchain.tsgoExecutable
+        ).pipe(Effect.flip)
+      );
+
+      expect(failure).toMatchObject({
+        _tag: "ProjectFailure",
+        code: "project-invalid",
+      });
+      expect(failure.message).toMatch(/exit code \d+|ENOENT|NotFound/u);
+      expect(failure.message).not.toContain("effectDoctorMissingSource");
+      expect(failure.message).not.toContain(root);
+    }));
+});
+
 describe("ProjectSnapshot reference graph", () => {
   it("visits a diamond reference once", () =>
     withWorkspace(async (root) => {
@@ -192,7 +223,7 @@ describe("ProjectSnapshot reference graph", () => {
           references: [{ path: "packages/app" }, { path: "packages/shared" }],
         })
       );
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
       const snapshot = await runWithNode(
         makeProjectSnapshot(
           root,
@@ -220,7 +251,7 @@ describe("ProjectSnapshot reference graph", () => {
         shared,
         JSON.stringify({ ...config, references: [{ path: "../app" }] })
       );
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
 
       await expect(
         runWithNode(
@@ -260,7 +291,7 @@ describe("ProjectSnapshot reference graph", () => {
           references: [{ path: "packages/app" }, { path: "packages/other" }],
         })
       );
-      const toolchain = await Effect.runPromise(resolveToolchain());
+      const toolchain = await runWithNode(resolveToolchain());
 
       await expect(
         runWithNode(

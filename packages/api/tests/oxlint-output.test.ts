@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeOxlintOutput } from "../src/internal/oxlint-output.js";
+import { decodeOxlintOutput } from "../src/internal/analyzers/oxlint-output.js";
 
 const validOutput = {
   diagnostics: [

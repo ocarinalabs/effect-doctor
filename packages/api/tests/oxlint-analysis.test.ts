@@ -6,9 +6,9 @@ import { NodeServices } from "@effect/platform-node";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { runOxlint } from "../src/internal/oxlint.js";
-import { resolveToolchain } from "../src/internal/toolchain.js";
-import type { AnalyzedSource } from "../src/internal/tsgo.js";
+import { runOxlint } from "../src/internal/analyzers/oxlint.js";
+import type { AnalyzedSource } from "../src/internal/analyzers/tsgo.js";
+import { resolveToolchain } from "../src/internal/project/toolchain.js";
 
 const withSources = async <A>(
   sourceByRelativePath: Readonly<Record<string, string>>,
@@ -21,7 +21,7 @@ const withSources = async <A>(
     ([relative, source]) => {
       const absolute = join(root, relative);
       writeFileSync(absolute, source);
-      return { absolute, relative, source };
+      return { absolute, bomLength: 0, relative, source };
     }
   );
   try {
@@ -32,7 +32,9 @@ const withSources = async <A>(
 };
 
 const analyze = async (root: string, sources: readonly AnalyzedSource[]) => {
-  const toolchain = await Effect.runPromise(resolveToolchain());
+  const toolchain = await Effect.runPromise(
+    resolveToolchain().pipe(Effect.provide(NodeServices.layer))
+  );
   return await Effect.runPromise(
     runOxlint(toolchain, root, sources).pipe(Effect.provide(NodeServices.layer))
   );
