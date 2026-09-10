@@ -151,3 +151,6 @@ CODEX.md
 # Vercel
 .vercel/
 .env.local
+
+# Claude Code local config
+.claude/

@@ -25,6 +25,7 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg);
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -161,8 +162,8 @@ main {
 .hero {
   display: grid;
   gap: 1.5rem;
-  max-width: 44rem;
-  padding: 5rem 1.5rem 3.5rem;
+  max-width: 47rem;
+  padding: 4rem 1.5rem 3.5rem;
 }
 
 h1 {
@@ -324,7 +325,7 @@ h1 {
 .docs {
   display: grid;
   gap: 3rem;
-  max-width: 44rem;
+  max-width: 47rem;
   padding: 4rem 1.5rem;
 }
 
