@@ -1,6 +1,3 @@
-import { realpathSync } from "node:fs";
-import { dirname, resolve as resolvePath, win32 } from "node:path";
-
 import {
   compareCodeUnits,
   fingerprintFinding,
@@ -12,19 +9,25 @@ import type {
   Finding,
   FindingWithoutFingerprint,
   RuleCatalogEntry,
+  SourcePosition,
 } from "@effect-doctor/core";
 import { FileSystem, Path, Effect } from "effect";
+import type { Duration } from "effect";
 
 import {
   InvalidAnalyzerOutput,
   AnalyzerFailure,
   ProjectFailure,
-} from "../errors.js";
-import { runProcess } from "./process.js";
-import type { ProjectSnapshot } from "./project-snapshot.js";
-import type { ToolchainPaths } from "./toolchain.js";
+} from "../../errors.js";
+import type { ProjectSnapshot } from "../project/snapshot.js";
+import { sourceView } from "../project/source-view.js";
+import type { AnalyzedSource } from "../project/source-view.js";
+import type { ToolchainPaths } from "../project/toolchain.js";
+import { outputExcerpt, runProcess } from "./process.js";
 import { decodeTsgoOutput } from "./tsgo-output.js";
 import type { TsgoDiagnostic, TsgoOutput } from "./tsgo-output.js";
+
+export type { AnalyzedSource } from "../project/source-view.js";
 
 const LSP_CONFIG = {
   diagnosticSeverity: tsgoDiagnosticSeverity,
@@ -39,9 +42,11 @@ type TsgoAnalysis = {
 
 export const runTsgo = Effect.fn("runTsgo")(function* (
   toolchain: ToolchainPaths,
-  tsconfig: string
+  tsconfig: string,
+  timeout?: Duration.Input | undefined
 ) {
-  const cwd = dirname(tsconfig);
+  const path = yield* Path.Path;
+  const cwd = path.dirname(tsconfig);
   const request = {
     cwd,
     format: "json",
@@ -56,6 +61,7 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
     cwd,
     engine: "effect-tsgo",
     executable: toolchain.tsgoExecutable,
+    timeout,
   });
 
   if (result.exitCode !== 0 && result.exitCode !== 1) {
@@ -64,7 +70,7 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
       exitCode: result.exitCode,
       message: `Effect TSGo exited with code ${result.exitCode}`,
       reason: "exit",
-      stderr: "",
+      stderr: outputExcerpt(result.stderr),
     });
   }
 
@@ -83,6 +89,27 @@ export const runTsgo = Effect.fn("runTsgo")(function* (
   } satisfies TsgoAnalysis;
 });
 
+const unsupportedEffectFailure = (
+  snapshot: ProjectSnapshot,
+  files: TsgoOutput["files"],
+  path: Path.Path
+): ProjectFailure | undefined => {
+  const file = files.find(
+    (entry) => entry.detectedEffect !== "v4" || entry.supportedEffect !== "v4"
+  );
+  if (file === undefined) {
+    return undefined;
+  }
+  const relative = path
+    .relative(snapshot.root, file.file)
+    .replaceAll("\\", "/");
+  return new ProjectFailure({
+    code: "effect-unsupported",
+    message: `${relative} is not compiled against Effect v4 (detected ${file.detectedEffect}). Effect Doctor analyzes only projects that depend on effect 4.x. Select one with --project.`,
+    root: snapshot.root,
+  });
+};
+
 export const validateTsgoFiles = Effect.fn("validateTsgoFiles")(function* (
   snapshot: ProjectSnapshot,
   analysis: TsgoAnalysis,
@@ -91,6 +118,14 @@ export const validateTsgoFiles = Effect.fn("validateTsgoFiles")(function* (
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const reportedFiles: string[] = [];
+  const unsupported = unsupportedEffectFailure(
+    snapshot,
+    analysis.output.files,
+    path
+  );
+  if (unsupported !== undefined) {
+    return yield* unsupported;
+  }
 
   for (const file of analysis.files) {
     const absolute = yield* fs.realPath(file).pipe(
@@ -125,65 +160,97 @@ export const validateTsgoFiles = Effect.fn("validateTsgoFiles")(function* (
   } satisfies AnalyzerRun;
 });
 
-export type AnalyzedSource = {
-  readonly absolute: string;
-  readonly relative: string;
-  readonly source: string;
-};
-
 const usesWindowsPathSemantics = (value: string): boolean =>
   process.platform === "win32" ||
   /^[A-Za-z]:[\\/]/u.test(value) ||
   value.startsWith("\\\\");
 
-const providerPathIdentity = (value: string): string => {
-  try {
-    const canonical = realpathSync(value);
+const windowsIdentity = (path: Path.Path, value: string): string =>
+  (process.platform === "win32"
+    ? path.normalize(value)
+    : value.replaceAll("/", "\\")
+  ).toLowerCase();
+
+const providerPathIdentity = Effect.fn("providerPathIdentity")(function* (
+  fs: FileSystem.FileSystem,
+  path: Path.Path,
+  value: string
+) {
+  const canonical = yield* fs
+    .realPath(value)
+    .pipe(Effect.orElseSucceed(() => undefined));
+  if (canonical !== undefined) {
     return usesWindowsPathSemantics(canonical)
-      ? win32.normalize(canonical).toLowerCase()
+      ? windowsIdentity(path, canonical)
       : canonical;
-  } catch {
-    return usesWindowsPathSemantics(value)
-      ? win32.normalize(value).toLowerCase()
-      : resolvePath(value);
   }
+  return usesWindowsPathSemantics(value)
+    ? windowsIdentity(path, value)
+    : path.resolve(value);
+});
+
+type SourceLookup = {
+  readonly find: (providerPath: string) => AnalyzedSource | undefined;
 };
 
-const sourceForDiagnostic = (
+const makeSourceLookup = Effect.fn("makeSourceLookup")(function* (
+  sources: readonly AnalyzedSource[],
+  providerPaths: readonly string[]
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const byIdentity = new Map<string, AnalyzedSource>();
+  for (const source of sources) {
+    byIdentity.set(
+      yield* providerPathIdentity(fs, path, source.absolute),
+      source
+    );
+  }
+  const resolved = new Map<string, AnalyzedSource | undefined>();
+  for (const providerPath of new Set(providerPaths)) {
+    resolved.set(
+      providerPath,
+      byIdentity.get(yield* providerPathIdentity(fs, path, providerPath))
+    );
+  }
+  return {
+    find: (providerPath) => resolved.get(providerPath),
+  } satisfies SourceLookup;
+});
+
+type ResolvedSpan = {
+  readonly end: SourcePosition;
+  readonly evidence: string;
+  readonly start: SourcePosition;
+};
+
+const samePosition = (
+  position: SourcePosition,
+  line: number,
+  column: number
+): boolean => position.line === line && position.column === column;
+
+const resolveSpan = (
   diagnostic: TsgoDiagnostic,
-  sources: readonly AnalyzedSource[]
-): AnalyzedSource | undefined => {
-  const diagnosticPath = providerPathIdentity(diagnostic.file);
-  return sources.find(
-    (source) => providerPathIdentity(source.absolute) === diagnosticPath
-  );
-};
-
-const positionAtOffset = (
-  source: string,
-  offset: number
-): { readonly column: number; readonly line: number } | undefined => {
-  if (offset > source.length) {
+  source: AnalyzedSource
+): ResolvedSpan | undefined => {
+  const { index } = sourceView(source);
+  const endOffset = diagnostic.start + diagnostic.length;
+  const start = index.positionAt(diagnostic.start);
+  const end = index.positionAt(endOffset);
+  if (
+    start === undefined ||
+    end === undefined ||
+    !samePosition(start, diagnostic.line, diagnostic.column) ||
+    !samePosition(end, diagnostic.endLine, diagnostic.endColumn)
+  ) {
     return undefined;
   }
-  const lines = source.slice(0, offset).split(/\r?\n/u);
   return {
-    column: (lines.at(-1) ?? "").length + 1,
-    line: lines.length,
+    end,
+    evidence: source.source.slice(diagnostic.start, endOffset),
+    start,
   };
-};
-
-const hasValidSpan = (diagnostic: TsgoDiagnostic, source: string): boolean => {
-  const start = positionAtOffset(source, diagnostic.start);
-  const end = positionAtOffset(source, diagnostic.start + diagnostic.length);
-  return (
-    start !== undefined &&
-    end !== undefined &&
-    start.line === diagnostic.line &&
-    start.column === diagnostic.column &&
-    end.line === diagnostic.endLine &&
-    end.column === diagnostic.endColumn
-  );
 };
 
 const ruleForTsgoFinding = Effect.fn("ruleForTsgoFinding")(function* (
@@ -218,42 +285,40 @@ const validateTsgoRule = Effect.fn("validateTsgoRule")(function* (
   }
 });
 
-const requireTsgoSource = Effect.fn("requireTsgoSource")(function* (
+const requireTsgoSpan = Effect.fn("requireTsgoSpan")(function* (
   diagnostic: TsgoDiagnostic,
-  sources: readonly AnalyzedSource[]
+  sources: SourceLookup
 ) {
-  const source = sourceForDiagnostic(diagnostic, sources);
+  const source = sources.find(diagnostic.file);
   if (source === undefined) {
     return yield* new InvalidAnalyzerOutput({
       engine: "effect-tsgo",
       message: "Effect TSGo diagnostic source is outside the project snapshot.",
     });
   }
-  if (!hasValidSpan(diagnostic, source.source)) {
+  const span = resolveSpan(diagnostic, source);
+  if (span === undefined) {
     return yield* new InvalidAnalyzerOutput({
       engine: "effect-tsgo",
-      message: "Effect TSGo diagnostic span is outside the project snapshot.",
+      message: `Effect TSGo diagnostic span is outside the project snapshot: ${source.relative}:${diagnostic.line}:${diagnostic.column}`,
     });
   }
-  return source;
+  return { source, span };
 });
 
 const makeTsgoFinding = (
   diagnostic: TsgoDiagnostic,
   rule: RuleCatalogEntry,
-  source: AnalyzedSource
+  source: AnalyzedSource,
+  span: ResolvedSpan
 ): Finding => {
-  const evidence = source.source.slice(
-    diagnostic.start,
-    diagnostic.start + diagnostic.length
-  );
   const withoutFingerprint = {
     category: rule.category,
-    evidence,
+    evidence: span.evidence,
     location: {
-      end: { column: diagnostic.endColumn, line: diagnostic.endLine },
+      end: span.end,
       file: source.relative,
-      start: { column: diagnostic.column, line: diagnostic.line },
+      start: span.start,
     },
     message: diagnostic.message,
     provenance: {
@@ -272,6 +337,10 @@ const makeTsgoFinding = (
 
 export const normalizeTsgoFindings = Effect.fn("normalizeTsgoFindings")(
   function* (analysis: TsgoAnalysis, sources: readonly AnalyzedSource[]) {
+    const lookup = yield* makeSourceLookup(
+      sources,
+      analysis.output.diagnostics.map((diagnostic) => diagnostic.file)
+    );
     const findings: Finding[] = [];
     for (const diagnostic of analysis.output.diagnostics) {
       const rule = yield* ruleForTsgoFinding(diagnostic);
@@ -279,8 +348,8 @@ export const normalizeTsgoFindings = Effect.fn("normalizeTsgoFindings")(
         continue;
       }
       yield* validateTsgoRule(diagnostic, rule);
-      const source = yield* requireTsgoSource(diagnostic, sources);
-      findings.push(makeTsgoFinding(diagnostic, rule, source));
+      const { source, span } = yield* requireTsgoSpan(diagnostic, lookup);
+      findings.push(makeTsgoFinding(diagnostic, rule, source, span));
     }
     return findings;
   }

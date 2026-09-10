@@ -81,15 +81,6 @@ const inventoryIssues = (output: TsgoOutputWire): Schema.FilterIssue[] => {
       "Every Effect TSGo diagnostic file must appear in the file inventory"
     );
   }
-  if (
-    output.files.some(
-      (file) => file.detectedEffect !== "v4" || file.supportedEffect !== "v4"
-    )
-  ) {
-    issues.push(
-      "Every file must have Effect v4 as its detected and supported Effect version"
-    );
-  }
   return issues;
 };
 
@@ -105,6 +96,5 @@ const TsgoOutputJsonSchema = Schema.fromJsonString(TsgoOutputSchema);
 
 export type TsgoOutput = typeof TsgoOutputSchema.Type;
 export type TsgoDiagnostic = typeof TsgoDiagnosticSchema.Type;
-export type TsgoFile = typeof TsgoFileSchema.Type;
 
 export const decodeTsgoOutput = Schema.decodeSync(TsgoOutputJsonSchema);

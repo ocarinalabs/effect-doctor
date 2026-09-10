@@ -5,13 +5,9 @@ import { Cause, Chunk, Effect, Schema, Stream } from "effect";
 import type { Duration, PlatformError } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
-import { AnalyzerFailure } from "../errors.js";
+import { AnalyzerFailure } from "../../errors.js";
 
-const ProcessEngineSchema = Schema.Literals([
-  "effect-tsgo",
-  "effect-oxlint",
-  "effect-doctor",
-]);
+const ProcessEngineSchema = Schema.Literals(["effect-tsgo", "effect-doctor"]);
 type ProcessEngine = typeof ProcessEngineSchema.Type;
 
 type ProcessRequest = {
@@ -45,6 +41,15 @@ const CHILD_ENVIRONMENT = {
 };
 
 const OUTPUT_LIMIT_ERROR = "Analyzer output exceeded its byte limit";
+
+const MAX_EXCERPT_LENGTH = 4000;
+
+export const outputExcerpt = (output: string): string => {
+  const trimmed = output.trim();
+  return trimmed.length <= MAX_EXCERPT_LENGTH
+    ? trimmed
+    : `${trimmed.slice(0, MAX_EXCERPT_LENGTH)}…`;
+};
 
 type OutputAccumulator = {
   readonly bytes: number;
