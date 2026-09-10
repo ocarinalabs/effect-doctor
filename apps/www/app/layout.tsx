@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   description:
-    "Deterministic checks for Effect v4 code, built for people and coding agents.",
+    "Static analysis for Effect v4 TypeScript, for people and coding agents.",
   title: {
     default: "Effect Doctor",
     template: "%s · Effect Doctor",
@@ -14,14 +14,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b0d0c",
+  colorScheme: "dark",
+  themeColor: "#09090b",
 };
-
-const SiteMark = () => (
-  <span aria-hidden="true" className="site-mark">
-    ED
-  </span>
-);
 
 export default function RootLayout({
   children,
@@ -29,36 +24,29 @@ export default function RootLayout({
   readonly children: ReactNode;
 }) {
   return (
-    <html data-scroll-behavior="smooth" lang="en">
+    <html lang="en">
       <body>
-        <a className="skip-link" href="#main-content">
+        <a className="skip-link" href="#main">
           Skip to content
         </a>
-        <header className="site-header">
-          <div className="shell header-inner">
-            <Link className="brand" href="/">
-              <SiteMark />
-              <span>Effect Doctor</span>
+        <div className="frame">
+          <header className="header">
+            <Link className="wordmark" href="/">
+              Effect Doctor
             </Link>
-            <nav aria-label="Main navigation" className="site-nav">
+            <nav aria-label="Site">
               <Link href="/rules">Rules</Link>
-              <a
-                href="https://github.com/ocarinalabs/effect-doctor"
-                rel="noreferrer"
-                target="_blank"
-              >
-                GitHub
-              </a>
+              <a href="https://github.com/ocarinalabs/effect-doctor">GitHub</a>
             </nav>
-          </div>
-        </header>
-        <main id="main-content">{children}</main>
-        <footer className="site-footer">
-          <div className="shell footer-inner">
-            <span>Effect v4 only. No telemetry.</span>
-            <span>MIT licensed.</span>
-          </div>
-        </footer>
+          </header>
+          <main id="main">{children}</main>
+          <footer className="footer">
+            <span>MIT License</span>
+            <a href="https://github.com/ocarinalabs/effect-doctor">
+              ocarinalabs/effect-doctor
+            </a>
+          </footer>
+        </div>
       </body>
     </html>
   );
