@@ -35,13 +35,15 @@ export type {
 export { compareFindingOrder } from "./internal/finding-order.js";
 export { sha256 } from "./internal/hash.js";
 export { compareCodeUnits } from "./internal/order.js";
+export { lineIndexAt, makePositionIndex } from "./internal/position.js";
+export type { PositionIndex, SourcePosition } from "./internal/position.js";
 export { PINNED_TOOLCHAIN } from "./pinned-toolchain.js";
 export { digestScanPolicy, SCAN_POLICY, ScanPolicySchema } from "./policy.js";
 export type { ScanPolicy, ScanPolicyRule } from "./policy.js";
 export { ComparisonReportSchema, ScanReportSchema } from "./report.js";
 export type { ComparisonReport, ScanReport, ScanTarget } from "./report.js";
 export {
-  effectOxlintRules,
+  doctorOxlintRules,
   integrityOxlintRules,
   knownRules,
   ruleForDiagnostic,
@@ -53,5 +55,4 @@ export type {
   RuleApplicability,
   RuleMetadata,
   RuleSource,
-  RuleStatus,
 } from "./rules.js";

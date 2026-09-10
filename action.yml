@@ -14,20 +14,17 @@ inputs:
   scope:
     description: "Pull request scope: changed, files, lines, or full. Other events always use full."
     default: changed
-  blocking:
-    description: "Lowest severity that fails the workflow: none, warning, or error."
-    default: none
   comment:
     description: Create or update a pull request summary comment
     default: "true"
   review-comments:
-    description: Add inline comments for Findings on changed lines
+    description: Add review comments for Findings on changed lines
     default: "true"
   commit-status:
     description: Publish an Effect Doctor commit status
     default: "true"
   node-version:
-    description: Node.js version used by Effect Doctor
+    description: Node.js version for the Action
     default: "24"
   version:
     description: Effect Doctor npm version or package specification
@@ -49,9 +46,6 @@ outputs:
   warning-count:
     description: Warning Findings selected by the requested scope
     value: ${{ steps.scan.outputs.warning-count }}
-  advice-count:
-    description: Advice Findings selected by the requested scope
-    value: ${{ steps.scan.outputs.advice-count }}
   affected-files:
     description: Files containing selected Findings
     value: ${{ steps.scan.outputs.affected-files }}
@@ -60,7 +54,7 @@ runs:
   using: composite
   steps:
     - name: Set up Node.js
-      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: ${{ inputs.node-version }}
         package-manager-cache: false
@@ -70,7 +64,6 @@ runs:
       shell: bash
       env:
         GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        INPUT_BLOCKING: ${{ inputs.blocking }}
         INPUT_DIRECTORY: ${{ inputs.directory }}
         INPUT_PROJECT: ${{ inputs.project }}
         INPUT_REVIEW_COMMENTS: ${{ inputs.review-comments }}
@@ -80,7 +73,7 @@ runs:
 
     - name: Publish GitHub report
       if: ${{ always() && steps.scan.outputs.result-file != '' }}
-      uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       env:
         COMPOSITE_ACTION_PATH: ${{ github.action_path }}
         EFFECT_DOCTOR_COMMENT: ${{ inputs.comment }}
@@ -105,7 +98,7 @@ runs:
             reviewComments: process.env.EFFECT_DOCTOR_REVIEW_COMMENTS,
           });
 
-    - name: Apply blocking policy
+    - name: Fail on Findings
       if: ${{ always() }}
       shell: bash
       env:

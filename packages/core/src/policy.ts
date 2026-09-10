@@ -4,9 +4,9 @@ import type { Severity } from "./finding.js";
 import { GENERATED_RULE_CATALOG } from "./generated/rule-catalog.js";
 import { sha256 } from "./internal/hash.js";
 import { compareCodeUnits } from "./internal/order.js";
-import type { RuleApplicability, RuleSource, RuleStatus } from "./rules.js";
+import type { RuleApplicability, RuleSource } from "./rules.js";
 
-const ACTIVE_RULE_COUNT = 150;
+const ACTIVE_RULE_COUNT = 118;
 const V4_COMPATIBILITY_REVISION = 1;
 
 const PolicyDigestSchema = Schema.NonEmptyString.pipe(
@@ -26,17 +26,18 @@ export type ScanPolicyRule = {
   readonly id: string;
   readonly providerRuleId: string;
   readonly source: RuleSource;
-  readonly status: RuleStatus;
   readonly title?: string;
 };
 
 export const ScanPolicySchema = Schema.Struct({
-  activeRuleCount: Schema.Literal(150),
+  activeRuleCount: Schema.Literal(118),
   digest: PolicyDigestSchema,
   id: Schema.Literal("effect-v4/default"),
-  revision: Schema.Literal(1),
+  revision: Schema.Literal(7),
 });
 export type ScanPolicy = typeof ScanPolicySchema.Type;
+
+const encodeJson = Schema.encodeSync(Schema.fromJsonString(Schema.Unknown));
 
 export const digestScanPolicy = (rules: readonly ScanPolicyRule[]): string => {
   const ids = rules.map((rule) => rule.id);
@@ -50,13 +51,10 @@ export const digestScanPolicy = (rules: readonly ScanPolicyRule[]): string => {
       id: rule.id,
       providerRuleId: rule.providerRuleId,
       source: rule.source,
-      status: rule.status,
       v4CompatibilityRevision: V4_COMPATIBILITY_REVISION,
     }))
     .sort((left, right) => compareCodeUnits(left.id, right.id));
-  return sha256(
-    Schema.encodeSync(Schema.fromJsonString(Schema.Unknown))(semanticRules)
-  );
+  return sha256(encodeJson(semanticRules));
 };
 
 if (GENERATED_RULE_CATALOG.length !== ACTIVE_RULE_COUNT) {
@@ -67,5 +65,5 @@ export const SCAN_POLICY: ScanPolicy = Object.freeze({
   activeRuleCount: ACTIVE_RULE_COUNT,
   digest: digestScanPolicy(GENERATED_RULE_CATALOG),
   id: "effect-v4/default",
-  revision: 1,
+  revision: 7,
 });

@@ -32,10 +32,10 @@ if (process.env.EFFECT_DOCTOR_TEST_FAIL === "1") {
 
 const target = { entry, projects: [entry] };
 const policy = {
-  activeRuleCount: 150,
-  digest: "4f6f047d4fb5b1c85f623439f0836bf1c2268bcd1377afbfb75eae74b15f91bb",
+  activeRuleCount: 157,
+  digest: "6e0f588e8d06811cce35190d3adc31f2eca4932912144b77822b393cbe09cd23",
   id: "effect-v4/default",
-  revision: 1,
+  revision: 3,
 };
 const applicability = {
   files: [
@@ -50,11 +50,33 @@ const applicability = {
 const scan = {
   applicability,
   doctorVersion: "0.1.0",
+  engines: [
+    {
+      analyzedFiles: ["src/main.ts"],
+      complete: true,
+      engine: "effect-doctor",
+      version: "0.1.0",
+    },
+    {
+      analyzedFiles: ["src/main.ts"],
+      complete: true,
+      engine: "effect-tsgo",
+      version: "0.40.0",
+    },
+  ],
   findings: [],
   kind: "scan",
   policy,
+  root: ".",
   schema: "effect-doctor/scan/v1",
+  summary: { errors: 0, warnings: 0 },
   target,
+  toolchain: {
+    effect: "4.0.0-rc.113",
+    oxlint: "1.80.0",
+    tsgo: "0.40.0",
+    typescript: "7.0.2",
+  },
 };
 const report =
   args[0] === "compare"
@@ -66,6 +88,7 @@ const report =
         kind: "comparison",
         resolved: [],
         schema: "effect-doctor/comparison/v1",
+        unchangedCount: 0,
       }
     : scan;
 

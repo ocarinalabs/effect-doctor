@@ -9,9 +9,9 @@ import {
   safePullRequestScope,
   selectFindings,
 } from "../diff.mjs";
-import { parseDoctorReport } from "../report.mjs";
+import { parseReportShape } from "../report.mjs";
 
-const scan = parseDoctorReport(
+const scan = parseReportShape(
   readFileSync(new URL("fixtures/scan.json", import.meta.url), "utf-8")
 );
 
@@ -31,6 +31,21 @@ test("unified patches yield candidate-side changed lines", () => {
   ].join("\n");
   const changed = parseChangedLines(patch);
   assert.deepEqual([...changed.get("src/program.ts")], [6, 7, 12]);
+});
+
+test("an added line that starts with ++ is content, not a file header", () => {
+  const patch = [
+    "diff --git src/counter.ts src/counter.ts",
+    "--- src/counter.ts",
+    "+++ src/counter.ts",
+    "@@ -1,2 +1,3 @@",
+    " let i = 0;",
+    "+++ i;",
+    "+i += 2;",
+  ].join("\n");
+  const changed = parseChangedLines(patch);
+  assert.deepEqual([...changed.keys()], ["src/counter.ts"]);
+  assert.deepEqual([...changed.get("src/counter.ts")], [2, 3]);
 });
 
 test("directory rebasing excludes files outside the project", () => {
@@ -63,8 +78,8 @@ test("lines scope selects Findings that begin on changed lines", () => {
     scope: "lines",
   });
   assert.deepEqual(
-    findings.map((finding) => finding.fingerprint),
-    ["first"]
+    findings.map((finding) => finding.ruleId),
+    ["effect-doctor/no-run-sync-on-suspending-effect"]
   );
 });
 

@@ -8,11 +8,11 @@ import { publish } from "../github.mjs";
 import {
   commentMarker,
   metricsFor,
-  parseDoctorReport,
+  parseReportShape,
   reviewMarker,
 } from "../report.mjs";
 
-const parsed = parseDoctorReport(
+const parsed = parseReportShape(
   readFileSync(new URL("fixtures/scan.json", import.meta.url), "utf-8")
 );
 
@@ -25,7 +25,6 @@ const context = {
 
 const makeResult = (overrides = {}) => ({
   blocked: false,
-  blocking: "none",
   changedLines: {
     "src/log.ts": [4],
     "src/program.ts": [12],

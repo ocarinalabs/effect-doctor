@@ -17,16 +17,47 @@ export const reviewMarker = (directory, targetEntry) =>
 export const statusContext = (directory, targetEntry) =>
   `Effect Doctor (${targetPath(directory, targetEntry)} · ${identity(directory, targetEntry)})`;
 
-const severities = ["error", "warning", "advice"];
+const severities = ["error", "warning"];
+const categories = new Set([
+  "correctness",
+  "antipattern",
+  "effect-native",
+  "style",
+  "security",
+  "resource-safety",
+]);
+const analyzerIds = ["effect-doctor", "effect-tsgo"];
+
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.length > 0;
+
+const isNatural = (value) => Number.isInteger(value) && value >= 0;
+
+const isPositiveInteger = (value) => Number.isInteger(value) && value >= 1;
+
+const sameValues = (left, right) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+const isUnique = (values) => new Set(values).size === values.length;
+
+const isRecord = (value) => typeof value === "object" && value !== null;
 
 const isProjectPath = (value) =>
-  typeof value === "string" &&
-  value !== "." &&
-  !value.includes("\\") &&
+  isNonEmptyString(value) &&
+  !value.startsWith("/") &&
+  !value.startsWith("\\") &&
   !/^[A-Za-z]:/u.test(value) &&
-  !path.posix.isAbsolute(value) &&
-  !value.startsWith("../") &&
-  path.posix.normalize(value) === value;
+  !value.includes("\\") &&
+  value
+    .split("/")
+    .every((segment) => segment !== "" && segment !== "." && segment !== "..");
+
+const invalidScanReport = () =>
+  new Error("Effect Doctor returned an invalid Scan Report");
+
+const invalidComparisonReport = () =>
+  new Error("Effect Doctor returned an invalid Comparison Report");
 
 const parseTarget = (target) => {
   if (
@@ -34,36 +65,18 @@ const parseTarget = (target) => {
     !Array.isArray(target.projects) ||
     !target.projects.every(isProjectPath) ||
     !target.projects.includes(target.entry) ||
-    new Set(target.projects).size !== target.projects.length ||
-    target.projects.some(
-      (project, index) => index > 0 && target.projects[index - 1] >= project
-    )
+    !isUnique(target.projects)
   ) {
     throw new Error("Effect Doctor returned an invalid project target");
   }
   return target;
 };
 
-const targetFor = (report, isComparison) => {
-  const target = parseTarget(
-    isComparison ? report.candidate?.target : report.target
-  );
-  if (
-    isComparison &&
-    parseTarget(report.baseline?.target).entry !== target.entry
-  ) {
-    throw new Error("Effect Doctor compared different project targets");
-  }
-  return target;
-};
-
-const isNatural = (value) => Number.isInteger(value) && value >= 0;
-
 const parsePolicy = (policy) => {
   if (
-    policy?.activeRuleCount !== 150 ||
-    policy.id !== "effect-v4/default" ||
-    policy.revision !== 1 ||
+    !isPositiveInteger(policy?.activeRuleCount) ||
+    !isNonEmptyString(policy.id) ||
+    !isPositiveInteger(policy.revision) ||
     typeof policy.digest !== "string" ||
     !/^[0-9a-f]{64}$/u.test(policy.digest)
   ) {
@@ -78,134 +91,275 @@ const samePolicy = (left, right) =>
   left.id === right.id &&
   left.revision === right.revision;
 
-const isCanonicalUnique = (values) =>
-  new Set(values).size === values.length &&
-  values.every((value, index) => index === 0 || values[index - 1] < value);
+const areSourceProfilesValid = (files) =>
+  Array.isArray(files) &&
+  files.length > 0 &&
+  files.every(
+    (profile) =>
+      isProjectPath(profile?.file) &&
+      typeof profile.directEffectModuleReference === "boolean"
+  ) &&
+  isUnique(files.map((profile) => profile.file));
 
-const areSourceProfilesValid = (files) => {
-  if (!(Array.isArray(files) && files.length > 0)) {
-    return false;
-  }
-  const paths = files.map((profile) => profile?.file);
+const areNotApplicableGroupsValid = (groups) =>
+  Array.isArray(groups) &&
+  groups.every(
+    (group) =>
+      isPositiveInteger(group?.count) &&
+      group.reason === "missing-direct-effect-module-reference" &&
+      isNonEmptyString(group.ruleId)
+  ) &&
+  isUnique(groups.map((group) => group.ruleId));
+
+const isApplicabilityShape = (applicability) =>
+  isRecord(applicability) &&
+  areSourceProfilesValid(applicability.files) &&
+  isRecord(applicability.notApplicable) &&
+  areNotApplicableGroupsValid(applicability.notApplicable.groups) &&
+  isNatural(applicability.notApplicable.total) &&
+  isNatural(applicability.normalizedDiagnosticCount);
+
+const isApplicabilityConsistent = (applicability, findings) => {
+  const { files, normalizedDiagnosticCount, notApplicable } = applicability;
+  const groupedTotal = notApplicable.groups.reduce(
+    (sum, group) => sum + group.count,
+    0
+  );
+  const sourceFiles = new Set(files.map((profile) => profile.file));
   return (
-    files.every(
-      (profile) =>
-        isProjectPath(profile?.file) &&
-        typeof profile.directEffectModuleReference === "boolean"
-    ) && isCanonicalUnique(paths)
+    groupedTotal === notApplicable.total &&
+    normalizedDiagnosticCount === findings.length + notApplicable.total &&
+    findings.every((finding) => sourceFiles.has(finding.location.file))
   );
 };
 
-const areNotApplicableGroupsValid = (groups) => {
-  if (!Array.isArray(groups)) {
-    return false;
-  }
-  const ruleIds = groups.map((group) => group?.ruleId);
-  return (
-    groups.every(
-      (group) =>
-        Number.isInteger(group?.count) &&
-        group.count >= 1 &&
-        group.reason === "missing-direct-effect-module-reference" &&
-        typeof group.ruleId === "string" &&
-        group.ruleId.length > 0
-    ) && isCanonicalUnique(ruleIds)
-  );
-};
-
-const parseApplicability = (applicability, applicableFindingCount) => {
-  const files = applicability?.files;
-  const groups = applicability?.notApplicable?.groups;
-  const total = applicability?.notApplicable?.total;
-  const normalized = applicability?.normalizedDiagnosticCount;
-  const groupedTotal = Array.isArray(groups)
-    ? groups.reduce((sum, group) => sum + (group?.count ?? 0), 0)
-    : -1;
+const parseApplicability = (applicability, findings) => {
   if (
-    !areSourceProfilesValid(files) ||
-    !areNotApplicableGroupsValid(groups) ||
-    !isNatural(total) ||
-    !isNatural(normalized) ||
-    groupedTotal !== total ||
-    normalized < total ||
-    (applicableFindingCount !== undefined &&
-      normalized !== applicableFindingCount + total)
+    !isApplicabilityShape(applicability) ||
+    !isApplicabilityConsistent(applicability, findings)
   ) {
     throw new Error("Effect Doctor returned an invalid applicability receipt");
   }
   return applicability;
 };
 
-const receiptFor = (report, isComparison) => {
-  if (!isComparison) {
-    return {
-      applicability: parseApplicability(
-        report.applicability,
-        Array.isArray(report.findings) ? report.findings.length : undefined
-      ),
-      policy: parsePolicy(report.policy),
-    };
-  }
-  const baselinePolicy = parsePolicy(report.baseline?.policy);
-  const candidatePolicy = parsePolicy(report.candidate?.policy);
-  if (!samePolicy(baselinePolicy, candidatePolicy)) {
-    throw new Error("Effect Doctor compared different scan policies");
-  }
-  parseApplicability(
-    report.baseline?.applicability,
-    Array.isArray(report.baseline?.findings)
-      ? report.baseline.findings.length
-      : undefined
-  );
-  return {
-    applicability: parseApplicability(
-      report.candidate?.applicability,
-      Array.isArray(report.candidate?.findings)
-        ? report.candidate.findings.length
-        : undefined
-    ),
-    policy: candidatePolicy,
-  };
-};
+const isPosition = (position) =>
+  isPositiveInteger(position?.column) && isPositiveInteger(position?.line);
+
+const isValidSpan = (location) =>
+  isProjectPath(location?.file) &&
+  isPosition(location?.start) &&
+  isPosition(location?.end) &&
+  (location.end.line > location.start.line ||
+    (location.end.line === location.start.line &&
+      location.end.column >= location.start.column));
+
+const FINDING_CHECKS = [
+  (finding) => categories.has(finding.category),
+  (finding) => typeof finding.evidence === "string",
+  (finding) => isNonEmptyString(finding.fingerprint),
+  (finding) => isValidSpan(finding.location),
+  (finding) => isNonEmptyString(finding.message),
+  (finding) => analyzerIds.includes(finding.provenance?.engine),
+  (finding) => isNonEmptyString(finding.provenance?.nativeRuleId),
+  (finding) => isNonEmptyString(finding.ruleId),
+  (finding) => severities.includes(finding.severity),
+  (finding) => isNonEmptyString(finding.title),
+];
 
 const assertFinding = (finding) => {
-  if (
-    typeof finding !== "object" ||
-    finding === null ||
-    !severities.includes(finding.severity) ||
-    typeof finding.ruleId !== "string" ||
-    typeof finding.message !== "string" ||
-    typeof finding.location?.file !== "string" ||
-    !Number.isInteger(finding.location?.start?.line)
-  ) {
-    throw new Error("Effect Doctor returned an invalid finding");
+  if (!isRecord(finding) || !FINDING_CHECKS.every((check) => check(finding))) {
+    throw invalidScanReport();
   }
 };
 
-export const parseDoctorReport = (source) => {
-  const report = JSON.parse(source);
-  const isScan = report?.schema === "effect-doctor/scan/v1";
-  const isComparison = report?.schema === "effect-doctor/comparison/v1";
-  if (!(isScan || isComparison)) {
-    throw new Error("Effect Doctor returned an unsupported report schema");
+const parseAnalyzerRuns = (runs) => {
+  if (
+    !Array.isArray(runs) ||
+    !sameValues(
+      runs.map((run) => run?.engine),
+      analyzerIds
+    )
+  ) {
+    throw invalidScanReport();
   }
+  const inventory = runs[0]?.analyzedFiles;
+  if (
+    !Array.isArray(inventory) ||
+    inventory.length === 0 ||
+    !inventory.every(isProjectPath) ||
+    !isUnique(inventory) ||
+    runs.some(
+      (run) =>
+        run?.complete !== true ||
+        !isNonEmptyString(run.version) ||
+        !Array.isArray(run.analyzedFiles) ||
+        !sameValues(run.analyzedFiles, inventory)
+    )
+  ) {
+    throw invalidScanReport();
+  }
+  return inventory;
+};
 
-  const findings = isComparison ? report.introduced : report.findings;
-  const resolved = isComparison ? report.resolved : [];
-  const target = targetFor(report, isComparison);
-  if (!(Array.isArray(findings) && Array.isArray(resolved))) {
-    throw new Error("Effect Doctor returned an invalid report");
+const parseToolchain = (toolchain) => {
+  if (
+    !isNonEmptyString(toolchain?.effect) ||
+    !isNonEmptyString(toolchain?.oxlint) ||
+    !isNonEmptyString(toolchain?.tsgo) ||
+    !isNonEmptyString(toolchain?.typescript)
+  ) {
+    throw invalidScanReport();
   }
-  for (const finding of [...findings, ...resolved]) {
+  return toolchain;
+};
+
+const parseSummary = (summary, findings) => {
+  const count = (severity) =>
+    findings.filter((finding) => finding.severity === severity).length;
+  if (
+    !isNatural(summary?.errors) ||
+    !isNatural(summary?.warnings) ||
+    summary.errors !== count("error") ||
+    summary.warnings !== count("warning")
+  ) {
+    throw invalidScanReport();
+  }
+};
+
+const SCAN_HEADER_CHECKS = [
+  (report) => report.schema === "effect-doctor/scan/v1",
+  (report) => report.kind === "scan",
+  (report) => report.root === ".",
+  (report) => isNonEmptyString(report.doctorVersion),
+  (report) => Array.isArray(report.findings),
+];
+
+const assertScanVersions = (report, toolchain) => {
+  const versions = Object.fromEntries(
+    report.engines.map((run) => [run.engine, run.version])
+  );
+  if (
+    versions["effect-doctor"] !== report.doctorVersion ||
+    versions["effect-tsgo"] !== toolchain.tsgo
+  ) {
+    throw invalidScanReport();
+  }
+};
+
+const parseScanReport = (report) => {
+  if (
+    !isRecord(report) ||
+    !SCAN_HEADER_CHECKS.every((check) => check(report))
+  ) {
+    throw invalidScanReport();
+  }
+  const target = parseTarget(report.target);
+  const policy = parsePolicy(report.policy);
+  const inventory = parseAnalyzerRuns(report.engines);
+  for (const finding of report.findings) {
     assertFinding(finding);
   }
-  return {
-    findings,
-    report,
-    resolved,
-    target,
-    ...receiptFor(report, isComparison),
-  };
+  if (
+    report.findings.some(
+      (finding) => !inventory.includes(finding.location.file)
+    )
+  ) {
+    throw invalidScanReport();
+  }
+  const applicability = parseApplicability(
+    report.applicability,
+    report.findings
+  );
+  if (
+    !sameValues(
+      applicability.files.map((profile) => profile.file),
+      inventory
+    )
+  ) {
+    throw invalidScanReport();
+  }
+  const toolchain = parseToolchain(report.toolchain);
+  assertScanVersions(report, toolchain);
+  parseSummary(report.summary, report.findings);
+  return { applicability, policy, report, target, toolchain };
+};
+
+const COMPARISON_HEADER_CHECKS = [
+  (report) => report.schema === "effect-doctor/comparison/v1",
+  (report) => report.kind === "comparison",
+  (report) => isNonEmptyString(report.doctorVersion),
+  (report) => Array.isArray(report.introduced),
+  (report) => Array.isArray(report.resolved),
+  (report) => isNatural(report.unchangedCount),
+];
+
+const assertComparableScans = (report, baseline, candidate) => {
+  if (
+    report.doctorVersion !== baseline.report.doctorVersion ||
+    report.doctorVersion !== candidate.report.doctorVersion
+  ) {
+    throw invalidComparisonReport();
+  }
+  if (!samePolicy(baseline.policy, candidate.policy)) {
+    throw new Error("Effect Doctor compared different scan policies");
+  }
+  if (baseline.target.entry !== candidate.target.entry) {
+    throw new Error("Effect Doctor compared different project targets");
+  }
+};
+
+const parseComparisonReport = (report) => {
+  if (
+    !isRecord(report) ||
+    !COMPARISON_HEADER_CHECKS.every((check) => check(report))
+  ) {
+    throw invalidComparisonReport();
+  }
+  const baseline = parseScanReport(report.baseline);
+  const candidate = parseScanReport(report.candidate);
+  assertComparableScans(report, baseline, candidate);
+  for (const finding of [...report.introduced, ...report.resolved]) {
+    assertFinding(finding);
+  }
+  if (
+    report.introduced.length > candidate.report.findings.length ||
+    report.resolved.length > baseline.report.findings.length
+  ) {
+    throw invalidComparisonReport();
+  }
+  return { baseline, candidate, report };
+};
+
+export const parseReportShape = (source) => {
+  const report = JSON.parse(source);
+  if (report?.schema === "effect-doctor/scan/v1") {
+    const scan = parseScanReport(report);
+    return {
+      applicability: scan.applicability,
+      engines: report.engines,
+      findings: report.findings,
+      policy: scan.policy,
+      report,
+      resolved: [],
+      target: scan.target,
+      toolchain: scan.toolchain,
+    };
+  }
+  if (report?.schema === "effect-doctor/comparison/v1") {
+    const comparison = parseComparisonReport(report);
+    return {
+      applicability: comparison.candidate.applicability,
+      engines: comparison.candidate.report.engines,
+      findings: report.introduced,
+      policy: comparison.candidate.policy,
+      report,
+      resolved: report.resolved,
+      target: comparison.candidate.target,
+      toolchain: comparison.candidate.toolchain,
+    };
+  }
+  throw new Error("Effect Doctor returned an unsupported report schema");
 };
 
 export const metricsFor = (findings, resolved = []) => {
@@ -216,7 +370,6 @@ export const metricsFor = (findings, resolved = []) => {
     ])
   );
   return {
-    adviceCount: counts.advice,
     affectedFiles: new Set(findings.map((finding) => finding.location.file))
       .size,
     errorCount: counts.error,
@@ -224,19 +377,6 @@ export const metricsFor = (findings, resolved = []) => {
     totalCount: findings.length,
     warningCount: counts.warning,
   };
-};
-
-export const blocks = (metrics, blocking) => {
-  if (blocking === "none" || blocking === "never") {
-    return false;
-  }
-  if (blocking === "warning") {
-    return metrics.errorCount + metrics.warningCount > 0;
-  }
-  if (blocking === "error") {
-    return metrics.errorCount > 0;
-  }
-  throw new Error(`Unsupported blocking threshold: ${blocking}`);
 };
 
 const escapeTableCell = (value) =>
@@ -306,7 +446,14 @@ const findingLines = (findings) => {
 };
 
 const receiptLines = (result) => {
-  if (!(result.completed && result.policy && result.applicability)) {
+  if (
+    !(
+      result.completed &&
+      result.policy &&
+      result.applicability &&
+      result.engines
+    )
+  ) {
     return [];
   }
   const applicable =
@@ -314,7 +461,10 @@ const receiptLines = (result) => {
     result.applicability.notApplicable.total;
   return [
     "",
-    `${result.policy.activeRuleCount} active rules · ${applicable} findings · ${result.applicability.notApplicable.total} diagnostics not applicable.`,
+    `Policy: \`${result.policy.id}@${result.policy.revision}\` · digest \`${result.policy.digest}\``,
+    `Analyzers: ${result.engines.map((run) => `${run.engine}@${run.version}`).join(", ")}`,
+    `Target: \`${result.target.entry}\` · ${result.target.projects.length} project configuration(s)`,
+    `Applicability: ${result.policy.activeRuleCount} active rules · ${applicable} findings · ${result.applicability.notApplicable.total} diagnostics not applicable.`,
   ];
 };
 
@@ -326,9 +476,9 @@ export const renderSummary = (result) => {
     "",
     `**${summaryState(result)}.** ${summaryHeadline(result)}`,
     "",
-    "| Errors | Warnings | Advice | Resolved |",
-    "| ---: | ---: | ---: | ---: |",
-    `| ${result.metrics.errorCount} | ${result.metrics.warningCount} | ${result.metrics.adviceCount} | ${result.metrics.resolvedCount} |`,
+    "| Errors | Warnings | Resolved |",
+    "| ---: | ---: | ---: |",
+    `| ${result.metrics.errorCount} | ${result.metrics.warningCount} | ${result.metrics.resolvedCount} |`,
     ...receiptLines(result),
     ...failureLines(result),
     ...findingLines(result.findings),
@@ -384,11 +534,10 @@ export const statusDescription = ({ completed, metrics, scope }) => {
     return "Analysis incomplete";
   }
   const prefix = scope === "changed" ? "Introduced" : "Found";
-  return `${prefix} ${metrics.errorCount} errors, ${metrics.warningCount} warnings, ${metrics.adviceCount} advice`;
+  return `${prefix} ${metrics.errorCount} errors, ${metrics.warningCount} warnings`;
 };
 
 export const outputValues = (result) => ({
-  "advice-count": result.metrics.adviceCount,
   "affected-files": result.metrics.affectedFiles,
   "error-count": result.metrics.errorCount,
   "resolved-findings": result.metrics.resolvedCount,

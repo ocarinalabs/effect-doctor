@@ -4,11 +4,10 @@ import { test } from "node:test";
 
 import {
   annotationCommand,
-  blocks,
   metricsFor,
   messageCommand,
   outputValues,
-  parseDoctorReport,
+  parseReportShape,
   renderSummary,
   statusDescription,
 } from "../report.mjs";
@@ -17,11 +16,103 @@ const fixture = (name) =>
   readFileSync(new URL(`fixtures/${name}.json`, import.meta.url), "utf-8");
 
 test("a Comparison Report selects introduced and resolved Findings", () => {
-  const parsed = parseDoctorReport(fixture("comparison"));
-  assert.equal(parsed.findings[0].fingerprint, "introduced");
-  assert.equal(parsed.resolved[0].fingerprint, "resolved");
-  assert.equal(parsed.policy.activeRuleCount, 150);
+  const parsed = parseReportShape(fixture("comparison"));
+  assert.equal(
+    parsed.findings[0].ruleId,
+    "effect-doctor/no-run-sync-on-suspending-effect"
+  );
+  assert.equal(
+    parsed.resolved[0].ruleId,
+    "effect-doctor/prefer-structured-log-data"
+  );
+  assert.equal(parsed.policy.activeRuleCount, 157);
   assert.equal(parsed.applicability.normalizedDiagnosticCount, 1);
+});
+
+test("a Scan Report requires a complete, well-formed receipt", () => {
+  const mutations = [
+    (report) => {
+      delete report.engines;
+    },
+    (report) => {
+      report.engines[1].complete = false;
+    },
+    (report) => {
+      report.engines[1].analyzedFiles = ["src/other.ts"];
+    },
+    (report) => {
+      delete report.toolchain;
+    },
+    (report) => {
+      report.summary.errors = 2;
+    },
+    (report) => {
+      report.findings[0].location.end = { column: 0, line: 4 };
+    },
+    (report) => {
+      report.findings[0].severity = "critical";
+    },
+  ];
+
+  for (const mutate of mutations) {
+    const report = JSON.parse(fixture("scan"));
+    mutate(report);
+    assert.throws(
+      () => parseReportShape(JSON.stringify(report)),
+      /invalid Scan Report/u
+    );
+  }
+});
+
+test("report paths must be normalized project-relative POSIX paths", () => {
+  for (const file of [
+    "zz/",
+    "..",
+    "../main.ts",
+    "src/./main.ts",
+    "/workspace/main.ts",
+    "src\\main.ts",
+    "C:/main.ts",
+  ]) {
+    const report = JSON.parse(fixture("scan"));
+    for (const run of report.engines) {
+      run.analyzedFiles = [file];
+    }
+    report.applicability.files = [{ directEffectModuleReference: true, file }];
+    report.findings = [];
+    report.applicability.normalizedDiagnosticCount = 0;
+    report.summary = { advice: 0, errors: 0, warnings: 0 };
+    assert.throws(
+      () => parseReportShape(JSON.stringify(report)),
+      /invalid Scan Report/u
+    );
+  }
+});
+
+test("a Comparison Report validates both scans and its finding lists", () => {
+  const mutations = [
+    (report) => {
+      delete report.baseline.engines;
+    },
+    (report) => {
+      report.introduced = [{ ruleId: "effect/floating-effect" }];
+    },
+    (report) => {
+      report.resolved = [
+        ...report.baseline.findings,
+        ...report.baseline.findings,
+      ];
+    },
+  ];
+
+  for (const mutate of mutations) {
+    const report = JSON.parse(fixture("comparison"));
+    mutate(report);
+    assert.throws(
+      () => parseReportShape(JSON.stringify(report)),
+      /invalid (?:Scan|Comparison) Report/u
+    );
+  }
 });
 
 test("a Comparison Report cannot mix scan policies", () => {
@@ -29,19 +120,60 @@ test("a Comparison Report cannot mix scan policies", () => {
   report.candidate.policy.digest = "0".repeat(64);
 
   assert.throws(
-    () => parseDoctorReport(JSON.stringify(report)),
+    () => parseReportShape(JSON.stringify(report)),
     /different scan policies/u
   );
 });
 
-test("an applicability receipt must reconcile with its scan", () => {
-  const report = JSON.parse(fixture("scan"));
-  report.applicability.normalizedDiagnosticCount = 4;
+test("a scan policy must carry a complete identity", () => {
+  const mutations = [
+    (report) => {
+      report.policy.activeRuleCount = 0;
+    },
+    (report) => {
+      report.policy.revision = "1";
+    },
+    (report) => {
+      report.policy.digest = "not-a-digest";
+    },
+    (report) => {
+      delete report.policy.id;
+    },
+  ];
 
-  assert.throws(
-    () => parseDoctorReport(JSON.stringify(report)),
-    /invalid applicability receipt/u
-  );
+  for (const mutate of mutations) {
+    const report = JSON.parse(fixture("scan"));
+    mutate(report);
+    assert.throws(
+      () => parseReportShape(JSON.stringify(report)),
+      /invalid scan policy/u
+    );
+  }
+});
+
+test("an applicability receipt must reconcile with its scan", () => {
+  const countMismatch = JSON.parse(fixture("scan"));
+  countMismatch.applicability.normalizedDiagnosticCount = 4;
+
+  const groupMismatch = JSON.parse(fixture("scan"));
+  groupMismatch.applicability.normalizedDiagnosticCount += 1;
+  groupMismatch.applicability.notApplicable = {
+    groups: [
+      {
+        count: 2,
+        reason: "missing-direct-effect-module-reference",
+        ruleId: "effect-doctor/no-globals",
+      },
+    ],
+    total: 1,
+  };
+
+  for (const report of [countMismatch, groupMismatch]) {
+    assert.throws(
+      () => parseReportShape(JSON.stringify(report)),
+      /invalid applicability receipt/u
+    );
+  }
 });
 
 test("a Comparison Report cannot mix project targets", () => {
@@ -52,21 +184,21 @@ test("a Comparison Report cannot mix project targets", () => {
   };
 
   assert.throws(
-    () => parseDoctorReport(JSON.stringify(report)),
+    () => parseReportShape(JSON.stringify(report)),
     /different project targets/u
   );
 });
 
-test("a project target must be unique and canonically ordered", () => {
+test("a project target must be unique and contain its entry", () => {
   for (const projects of [
     ["tsconfig.json", "tsconfig.json"],
-    ["tsconfig.json", "packages/app/tsconfig.json"],
+    ["packages/app/tsconfig.json"],
   ]) {
     const report = JSON.parse(fixture("scan"));
     report.target.projects = projects;
 
     assert.throws(
-      () => parseDoctorReport(JSON.stringify(report)),
+      () => parseReportShape(JSON.stringify(report)),
       /invalid project target/u
     );
   }
@@ -77,34 +209,20 @@ test("a Comparison Report validates the baseline project graph", () => {
   report.baseline.target.projects = [];
 
   assert.throws(
-    () => parseDoctorReport(JSON.stringify(report)),
+    () => parseReportShape(JSON.stringify(report)),
     /invalid project target/u
   );
 });
 
-test("blocking policy ignores advice and respects its threshold", () => {
-  const advice = metricsFor([
-    parseDoctorReport(fixture("scan")).findings.find(
-      (finding) => finding.severity === "advice"
-    ),
-  ]);
-  assert.equal(blocks(advice, "error"), false);
-  assert.equal(blocks(advice, "warning"), false);
-
-  const all = metricsFor(parseDoctorReport(fixture("scan")).findings);
-  assert.equal(blocks(all, "none"), false);
-  assert.equal(blocks(all, "warning"), true);
-  assert.equal(blocks(all, "error"), true);
-});
-
 test("summary exposes Findings without inventing a score", () => {
-  const parsed = parseDoctorReport(fixture("comparison"));
+  const parsed = parseReportShape(fixture("comparison"));
   const metrics = metricsFor(parsed.findings, parsed.resolved);
   const summary = renderSummary({
     blocked: true,
     completed: true,
     directory: ".",
     doctorVersion: "0.1.0",
+    engines: parsed.engines,
     findings: parsed.findings,
     applicability: parsed.applicability,
     metrics,
@@ -113,7 +231,9 @@ test("summary exposes Findings without inventing a score", () => {
     target: parsed.target,
   });
   assert.match(summary, /1 finding across 1 file/u);
-  assert.match(summary, /150 active rules/u);
+  assert.match(summary, /157 active rules/u);
+  assert.match(summary, /effect-v4\/default@3/u);
+  assert.match(summary, /effect-doctor@0\.1\.0/u);
   assert.match(summary, /effect-doctor\/no-run-sync-on-suspending-effect/u);
   assert.doesNotMatch(summary, /score/iu);
 });
@@ -139,8 +259,12 @@ test("an incomplete summary preserves the Analyzer Run failure", () => {
 });
 
 test("workflow annotations preserve locations and escape command payloads", () => {
+  const sourceFinding = parseReportShape(fixture("scan")).findings.find(
+    (finding) => finding.severity === "error"
+  );
+  assert.notEqual(sourceFinding, undefined);
   const finding = {
-    ...parseDoctorReport(fixture("scan")).findings[0],
+    ...sourceFinding,
     message: "unsafe: value, 100%\nnext line",
   };
   const command = annotationCommand(finding, "packages/app", "/workspace");
@@ -159,24 +283,23 @@ test("plain workflow messages cannot inject a second command", () => {
 });
 
 test("Action outputs expose Finding counts without a score", () => {
-  const metrics = metricsFor(parseDoctorReport(fixture("scan")).findings);
+  const metrics = metricsFor(parseReportShape(fixture("scan")).findings);
   const outputs = outputValues({ metrics });
   assert.deepEqual(outputs, {
-    "advice-count": 1,
     "affected-files": 2,
     "error-count": 1,
     "resolved-findings": 0,
     "total-findings": 3,
-    "warning-count": 1,
+    "warning-count": 2,
   });
   assert.equal("score" in outputs, false);
 });
 
 test("commit status describes selected Findings", () => {
-  const metrics = metricsFor(parseDoctorReport(fixture("scan")).findings);
+  const metrics = metricsFor(parseReportShape(fixture("scan")).findings);
   assert.equal(
     statusDescription({ completed: true, metrics, scope: "full" }),
-    "Found 1 errors, 1 warnings, 1 advice"
+    "Found 1 errors, 2 warnings"
   );
   assert.equal(
     statusDescription({ completed: false, metrics, scope: "full" }),

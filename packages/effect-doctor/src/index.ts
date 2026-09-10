@@ -27,5 +27,5 @@ export type {
   ScanRequest,
   ScanTarget,
 } from "@effect-doctor/api";
-export { isBlocked, renderComparison, renderScan } from "./render.js";
-export type { BlockingThreshold, OutputFormat } from "./render.js";
+export { renderComparison, renderScan } from "./render.js";
+export type { OutputFormat } from "./render.js";

@@ -21,11 +21,10 @@ import {
 } from "./diff.mjs";
 import {
   annotationCommand,
-  blocks,
   metricsFor,
   messageCommand,
   outputValues,
-  parseDoctorReport,
+  parseReportShape,
   renderSummary,
 } from "./report.mjs";
 
@@ -84,10 +83,10 @@ const packageSpec = (version) => {
   ) {
     return version;
   }
-  if (version.startsWith("@ocarinalabs/effect-doctor@")) {
+  if (version.startsWith("dr-effect@")) {
     return version;
   }
-  return `@ocarinalabs/effect-doctor@${version}`;
+  return `dr-effect@${version}`;
 };
 
 const installDoctor = (version) => {
@@ -110,6 +109,7 @@ const installDoctor = (version) => {
       "--no-save",
       "--no-audit",
       "--no-fund",
+      "--ignore-scripts",
       spec,
     ]);
     if (installation.status !== 0) {
@@ -252,17 +252,13 @@ const makeBaseline = (repositoryRoot, candidate, prefix, baseSha) => {
 };
 
 const runDoctor = (executable, args) => {
-  const result = run(
-    executable,
-    [...args, "--format", "json", "--blocking", "never"],
-    {
-      env: {
-        ...process.env,
-        NO_COLOR: "1",
-      },
-    }
-  );
-  if (result.status !== 0) {
+  const result = run(executable, [...args, "--format", "json"], {
+    env: {
+      ...process.env,
+      NO_COLOR: "1",
+    },
+  });
+  if (result.status !== 0 && result.status !== 1) {
     throw new Error(
       result.stdout.trim() ||
         result.stderr.trim() ||
@@ -279,7 +275,6 @@ const appendOutput = (name, value) => {
 };
 
 const emptyMetrics = () => ({
-  adviceCount: 0,
   affectedFiles: 0,
   errorCount: 0,
   resolvedCount: 0,
@@ -329,11 +324,6 @@ const emitResult = (result) => {
 };
 
 const readActionRequest = () => ({
-  blocking: normalizeChoice(
-    input("blocking", "none"),
-    ["none", "warning", "error"],
-    "blocking"
-  ),
   directoryInput: input("directory", "."),
   projectInput: input("project", "tsconfig.json"),
   requestedScope: normalizeChoice(
@@ -487,13 +477,7 @@ const analyzeProject = ({
   }
 };
 
-const completedResult = ({
-  blocking,
-  changes,
-  directoryInput,
-  parsed,
-  prefix,
-}) => {
+const completedResult = ({ changes, directoryInput, parsed, prefix }) => {
   const findings = selectFindings({
     changedFiles: changes.changedFiles,
     changedLines: changes.changedLines,
@@ -503,12 +487,12 @@ const completedResult = ({
   const resolved = changes.scope === "changed" ? parsed.resolved : [];
   const metrics = metricsFor(findings, resolved);
   return {
-    blocked: blocks(metrics, blocking),
-    blocking,
+    blocked: metrics.totalCount > 0,
     changedLines: serializeChangedLines(changes.changedLines),
     completed: true,
     directory: directoryInput,
     doctorVersion: parsed.report.doctorVersion,
+    engines: parsed.engines,
     findings,
     applicability: parsed.applicability,
     metrics,
@@ -517,6 +501,7 @@ const completedResult = ({
     resolved,
     scope: changes.scope,
     target: parsed.target,
+    toolchain: parsed.toolchain,
   };
 };
 
@@ -544,9 +529,8 @@ const main = () => {
       scope: changes.scope,
       targetEntry: project.targetEntry,
     });
-    const parsed = parseDoctorReport(analysis.reportSource);
+    const parsed = parseReportShape(analysis.reportSource);
     result = completedResult({
-      blocking: request.blocking,
       changes: { ...changes, scope: analysis.scope },
       directoryInput: request.directoryInput,
       parsed,
@@ -555,7 +539,6 @@ const main = () => {
   } catch (error) {
     result = {
       blocked: true,
-      blocking: request.blocking,
       changedLines: {},
       completed: false,
       directory: request.directoryInput,
@@ -590,7 +573,6 @@ try {
 } catch (error) {
   emitResult({
     blocked: true,
-    blocking: input("blocking", "none"),
     changedLines: {},
     completed: false,
     directory: input("directory", "."),

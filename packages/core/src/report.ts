@@ -18,6 +18,7 @@ import { compareCodeUnits } from "./internal/order.js";
 import { ScanPolicySchema } from "./policy.js";
 import type { ScanPolicy } from "./policy.js";
 import { knownRules } from "./rules.js";
+import type { RuleMetadata } from "./rules.js";
 
 const ScanTargetWire = Schema.Struct({
   entry: ProjectRelativePathSchema,
@@ -55,7 +56,6 @@ const ScanReportWire = Schema.Struct({
   target: ScanTargetSchema,
   toolchain: Schema.Struct({
     effect: Schema.NonEmptyString,
-    effectOxlint: Schema.NonEmptyString,
     oxlint: Schema.NonEmptyString,
     tsgo: Schema.NonEmptyString,
     typescript: Schema.NonEmptyString,
@@ -86,9 +86,7 @@ const isOrdered = <A>(
 const analyzerRunIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   const issues: Schema.FilterIssue[] = [];
   const analyzers = report.engines.map((run) => run.engine);
-  if (
-    !sameStrings(analyzers, ["effect-doctor", "effect-oxlint", "effect-tsgo"])
-  ) {
+  if (!sameStrings(analyzers, ["effect-doctor", "effect-tsgo"])) {
     issues.push("Scan report must contain each Analyzer Run exactly once");
   }
   if (report.engines.some((run) => !run.complete)) {
@@ -135,7 +133,6 @@ const versionIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   );
   if (
     versions.get("effect-doctor") !== report.doctorVersion ||
-    versions.get("effect-oxlint") !== report.toolchain.effectOxlint ||
     versions.get("effect-tsgo") !== report.toolchain.tsgo
   ) {
     return ["Analyzer Run versions must match the report toolchain"];
@@ -147,7 +144,6 @@ const summaryIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   const count = (severity: Severity): number =>
     report.findings.filter((finding) => finding.severity === severity).length;
   if (
-    report.summary.advice === count("advice") &&
     report.summary.errors === count("error") &&
     report.summary.warnings === count("warning")
   ) {
@@ -156,18 +152,24 @@ const summaryIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   return ["Scan summary must match emitted Findings"];
 };
 
-const applicabilityIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
-  const issues: Schema.FilterIssue[] = [];
-  const inventory = report.engines.at(0)?.analyzedFiles ?? [];
-  const profiles = report.applicability.files;
-  const profileFiles = profiles.map((profile) => profile.file);
-  if (!sameStrings(inventory, profileFiles)) {
-    issues.push(
-      "Applicability profiles must match the Analyzer Run inventory exactly"
-    );
-  }
+const ruleIndex = (): ReadonlyMap<string, RuleMetadata> =>
+  new Map(
+    knownRules().map((rule): readonly [string, RuleMetadata] => [rule.id, rule])
+  );
 
-  const { groups } = report.applicability.notApplicable;
+const inventoryIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
+  const inventory = report.engines.at(0)?.analyzedFiles ?? [];
+  const profileFiles = report.applicability.files.map(
+    (profile) => profile.file
+  );
+  return sameStrings(inventory, profileFiles)
+    ? []
+    : ["Applicability profiles must match the Analyzer Run inventory exactly"];
+};
+
+const notApplicableIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
+  const issues: Schema.FilterIssue[] = [];
+  const { groups, total } = report.applicability.notApplicable;
   const groupRuleIds = groups.map((group) => group.ruleId);
   if (
     new Set(groupRuleIds).size !== groupRuleIds.length ||
@@ -175,36 +177,18 @@ const applicabilityIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   ) {
     issues.push("Not-applicable groups must be unique and canonically ordered");
   }
-  const groupedTotal = groups.reduce((total, group) => total + group.count, 0);
-  if (groupedTotal !== report.applicability.notApplicable.total) {
+  if (groups.reduce((sum, group) => sum + group.count, 0) !== total) {
     issues.push("Not-applicable group counts must equal their total");
   }
   if (
-    report.findings.length + report.applicability.notApplicable.total !==
+    report.findings.length + total !==
     report.applicability.normalizedDiagnosticCount
   ) {
     issues.push(
       "Applicable and not-applicable diagnostics must equal the normalized diagnostic count"
     );
   }
-
-  const rules = new Map(knownRules().map((rule) => [rule.id, rule]));
-  const sourceByFile = new Map(
-    profiles.map((profile) => [profile.file, profile])
-  );
-  if (
-    report.findings.some((finding) => {
-      const rule = rules.get(finding.ruleId);
-      const source = sourceByFile.get(finding.location.file);
-      return (
-        rule === undefined ||
-        source === undefined ||
-        !decideRuleApplicability(rule, source).applicable
-      );
-    })
-  ) {
-    issues.push("Every emitted Finding must satisfy its rule applicability");
-  }
+  const rules = ruleIndex();
   if (
     groups.some(
       (group) =>
@@ -215,7 +199,9 @@ const applicabilityIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   }
   if (
     groups.length > 0 &&
-    profiles.every((profile) => profile.directEffectModuleReference)
+    report.applicability.files.every(
+      (profile) => profile.directEffectModuleReference
+    )
   ) {
     issues.push(
       "Not-applicable diagnostics require a source without a direct Effect module reference"
@@ -223,6 +209,33 @@ const applicabilityIssues = (report: ScanReportWire): Schema.FilterIssue[] => {
   }
   return issues;
 };
+
+const findingApplicabilityIssues = (
+  report: ScanReportWire
+): Schema.FilterIssue[] => {
+  const rules = ruleIndex();
+  const sourceByFile = new Map(
+    report.applicability.files.map((profile) => [profile.file, profile])
+  );
+  const outsidePolicy = report.findings.some((finding) => {
+    const rule = rules.get(finding.ruleId);
+    const source = sourceByFile.get(finding.location.file);
+    return (
+      rule === undefined ||
+      source === undefined ||
+      !decideRuleApplicability(rule, source).applicable
+    );
+  });
+  return outsidePolicy
+    ? ["Every emitted Finding must satisfy its rule applicability"]
+    : [];
+};
+
+const applicabilityIssues = (report: ScanReportWire): Schema.FilterIssue[] => [
+  ...inventoryIssues(report),
+  ...notApplicableIssues(report),
+  ...findingApplicabilityIssues(report),
+];
 
 export const ScanReportSchema = ScanReportWire.check(
   Schema.makeFilter((report) => [

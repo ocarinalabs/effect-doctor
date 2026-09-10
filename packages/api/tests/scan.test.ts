@@ -1,3 +1,4 @@
+import { Buffer } from "node:buffer";
 import {
   cpSync,
   mkdirSync,
@@ -20,7 +21,10 @@ import { compareProjects, scanProject } from "../src/index.js";
 const fixture = (name: "clean" | "doctor" | "invalid" | "solution"): string =>
   fileURLToPath(new URL(`fixtures/${name}`, import.meta.url));
 
-const copyFixture = (name: "clean" | "solution", prefix: string) => {
+const copyFixture = (
+  name: "clean" | "invalid" | "solution",
+  prefix: string
+) => {
   const holder = mkdtempSync(
     join(fileURLToPath(new URL("fixtures/", import.meta.url)), prefix)
   );
@@ -147,8 +151,131 @@ describe("scanProject", () => {
       await expect(
         Effect.runPromise(scanProject({ root: workspace.root }))
       ).rejects.toMatchObject({
-        _tag: "InvalidAnalyzerOutput",
-        engine: "effect-tsgo",
+        _tag: "ProjectFailure",
+        code: "effect-unsupported",
+        message: expect.stringContaining("packages/neutral/src/neutral.ts"),
+      });
+    } finally {
+      rmSync(workspace.holder, { force: true, recursive: true });
+    }
+  }, 30_000);
+
+  it("reports the same findings with or without a byte order mark", async () => {
+    const workspace = copyFixture("invalid", "bom-");
+    const line =
+      'import { Config, Effect } from "effect"; export const key = Config.String("API_KEY"); export const run = Effect.gen(function* () { Effect.succeed(1); yield* Effect.succeed(2); });\n';
+    writeFileSync(join(workspace.root, "src", "plain.ts"), line);
+    writeFileSync(join(workspace.root, "src", "bom.ts"), `\uFEFF${line}`);
+
+    try {
+      const report = await Effect.runPromise(
+        scanProject({ root: workspace.root })
+      );
+      const findingsFor = (file: string) =>
+        report.findings
+          .filter((finding) => finding.location.file === file)
+          .map(({ evidence, fingerprint, location, ruleId }) => ({
+            column: location.start.column,
+            evidence,
+            fingerprint,
+            line: location.start.line,
+            ruleId,
+          }));
+      const plain = findingsFor("src/plain.ts");
+      expect(plain).toContainEqual(
+        expect.objectContaining({
+          line: 1,
+          ruleId: "effect-doctor/prefer-config-redacted",
+        })
+      );
+      expect(plain).toContainEqual(
+        expect.objectContaining({
+          column: line.indexOf("Effect.succeed(1)") + 1,
+          line: 1,
+          ruleId: "effect/floating-effect",
+        })
+      );
+      expect(findingsFor("src/bom.ts")).toEqual(plain);
+    } finally {
+      rmSync(workspace.holder, { force: true, recursive: true });
+    }
+  }, 30_000);
+
+  it("counts carriage returns as line breaks like the analyzers", async () => {
+    const workspace = copyFixture("invalid", "cr-");
+    const lines = [
+      'import { Config, Effect } from "effect";',
+      "",
+      'export const key = \rConfig.String("API_KEY");',
+      "",
+      "export const run = Effect.gen(function* () {",
+      "  Effect.succeed(1);",
+      "  return yield* Effect.succeed(2);",
+      "});",
+      "",
+    ];
+    writeFileSync(join(workspace.root, "src", "cr.ts"), lines.join("\r"));
+    writeFileSync(join(workspace.root, "src", "stray.ts"), lines.join("\n"));
+
+    try {
+      const report = await Effect.runPromise(
+        scanProject({ root: workspace.root })
+      );
+      const positions = (file: string) =>
+        report.findings
+          .filter((finding) => finding.location.file === file)
+          .map((finding) => ({
+            column: finding.location.start.column,
+            line: finding.location.start.line,
+            ruleId: finding.ruleId,
+          }));
+      expect(positions("src/cr.ts")).toEqual(
+        expect.arrayContaining([
+          {
+            column: 1,
+            line: 4,
+            ruleId: "effect-doctor/prefer-config-redacted",
+          },
+          { column: 3, line: 7, ruleId: "effect/floating-effect" },
+        ])
+      );
+      expect(positions("src/stray.ts")).toEqual(positions("src/cr.ts"));
+    } finally {
+      rmSync(workspace.holder, { force: true, recursive: true });
+    }
+  }, 30_000);
+
+  it("rejects a source that is not valid UTF-8 and names it", async () => {
+    const workspace = copyFixture("invalid", "latin1-");
+    writeFileSync(
+      join(workspace.root, "src", "latin1.ts"),
+      Buffer.from('export const name = "caf\u00E9";\n', "latin1")
+    );
+
+    try {
+      await expect(
+        Effect.runPromise(scanProject({ root: workspace.root }))
+      ).rejects.toMatchObject({
+        _tag: "ProjectFailure",
+        code: "source-invalid",
+        message: expect.stringContaining("src/latin1.ts"),
+      });
+    } finally {
+      rmSync(workspace.holder, { force: true, recursive: true });
+    }
+  }, 30_000);
+
+  it("names both paths when a symlink duplicates a project source", async () => {
+    const workspace = copyFixture("invalid", "alias-");
+    symlinkSync("main.ts", join(workspace.root, "src", "alias.ts"));
+
+    try {
+      await expect(
+        Effect.runPromise(scanProject({ root: workspace.root }))
+      ).rejects.toMatchObject({
+        _tag: "ProjectFailure",
+        code: "duplicate-source",
+        message: expect.stringContaining("src/alias.ts"),
       });
     } finally {
       rmSync(workspace.holder, { force: true, recursive: true });
@@ -196,7 +323,6 @@ describe("scanProject", () => {
 
     expect(report.engines.map((engine) => engine.engine)).toEqual([
       "effect-doctor",
-      "effect-oxlint",
       "effect-tsgo",
     ]);
     expect(report.engines.every((engine) => engine.complete)).toBe(true);
@@ -216,11 +342,7 @@ describe("scanProject", () => {
     const workspace = copyFixture("clean", "applicability-");
     writeFileSync(
       join(workspace.root, "src", "plain.ts"),
-      [
-        "export const label = (ready: boolean) =>",
-        '  ready ? "ready" : "waiting";',
-        "",
-      ].join("\n")
+      ["export const roll = () => Math.random();", ""].join("\n")
     );
     writeFileSync(
       join(workspace.root, "src", "effect-module.ts"),
@@ -228,8 +350,7 @@ describe("scanProject", () => {
         'import { Effect } from "effect";',
         "",
         'export const program = Effect.succeed("ready");',
-        "export const label = (ready: boolean) =>",
-        '  ready ? "ready" : "waiting";',
+        "export const roll = () => Math.random();",
         "",
       ].join("\n")
     );
@@ -254,9 +375,9 @@ describe("scanProject", () => {
       );
 
       expect(report.policy).toMatchObject({
-        activeRuleCount: 150,
+        activeRuleCount: 118,
         id: "effect-v4/default",
-        revision: 1,
+        revision: 7,
       });
       expect(profiles.get("src/plain.ts")).toMatchObject({
         directEffectModuleReference: false,
@@ -266,21 +387,21 @@ describe("scanProject", () => {
       });
       expect(report.applicability.notApplicable.groups).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ ruleId: "effect/no-ternary" }),
+          expect.objectContaining({ ruleId: "effect/global-random" }),
         ])
       );
       expect(
         report.findings.some(
           (finding) =>
             finding.location.file === "src/plain.ts" &&
-            finding.ruleId === "effect/no-ternary"
+            finding.ruleId === "effect/global-random"
         )
       ).toBe(false);
       expect(
         report.findings.some(
           (finding) =>
             finding.location.file === "src/effect-module.ts" &&
-            finding.ruleId === "effect/no-ternary"
+            finding.ruleId === "effect/global-random"
         )
       ).toBe(true);
       for (const file of ["src/worker.test.ts", "src/client.generated.ts"]) {
@@ -320,14 +441,72 @@ describe("scanProject", () => {
         expect.objectContaining({
           location: expect.objectContaining({ file: "src/main.ts" }),
           provenance: {
-            engine: "effect-oxlint",
-            nativeRuleId: "effect(noUnboundedRetry)",
+            engine: "effect-doctor",
+            nativeRuleId: "prefer-config-redacted",
           },
-          ruleId: "effect/no-unbounded-retry",
+          ruleId: "effect-doctor/prefer-config-redacted",
           severity: "error",
         }),
       ])
     );
+  }, 30_000);
+
+  it("reports UTF-16 columns from every analyzer", async () => {
+    const workspace = copyFixture("invalid", "unicode-columns-");
+    writeFileSync(
+      join(workspace.root, "src", "main.ts"),
+      [
+        'import { Config, Effect } from "effect";',
+        "",
+        '/* é */ export const key = Config.String("API_KEY");',
+        "export const program = Effect.gen(function* () {",
+        '  /* 😀 */ Effect.succeed("floating");',
+        '  return yield* Effect.succeed("done");',
+        "});",
+        "",
+      ].join("\n")
+    );
+
+    try {
+      const report = await Effect.runPromise(
+        scanProject({ root: workspace.root })
+      );
+      expect(report.findings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            evidence: 'Effect.succeed("floating")',
+            location: expect.objectContaining({
+              end: { column: 38, line: 5 },
+              start: { column: 12, line: 5 },
+            }),
+            provenance: expect.objectContaining({ engine: "effect-tsgo" }),
+            ruleId: "effect/floating-effect",
+          }),
+          expect.objectContaining({
+            evidence: 'Config.String("API_KEY")',
+            location: expect.objectContaining({
+              end: { column: 52, line: 3 },
+              start: { column: 28, line: 3 },
+            }),
+            provenance: expect.objectContaining({ engine: "effect-doctor" }),
+            ruleId: "effect-doctor/prefer-config-redacted",
+          }),
+        ])
+      );
+    } finally {
+      rmSync(workspace.holder, { force: true, recursive: true });
+    }
+  }, 30_000);
+
+  it("stops when an analyzer exceeds the requested timeout", async () => {
+    await expect(
+      Effect.runPromise(
+        scanProject({ analyzerTimeout: "1 millis", root: fixture("clean") })
+      )
+    ).rejects.toMatchObject({
+      _tag: "AnalyzerFailure",
+      reason: "timeout",
+    });
   }, 30_000);
 
   it("runs every first-party rule without exposing the Oxlint canary", async () => {
@@ -396,7 +575,7 @@ describe("compareProjects", () => {
     expect(report.introduced.map((finding) => finding.ruleId)).toEqual(
       expect.arrayContaining([
         "effect/floating-effect",
-        "effect/no-unbounded-retry",
+        "effect-doctor/prefer-config-redacted",
       ])
     );
     expect(report.resolved).toEqual([]);

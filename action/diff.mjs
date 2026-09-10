@@ -24,7 +24,10 @@ const hunkStart = (line) => {
     : Math.trunc(Number(match.groups.startLine));
 };
 
-const isAddedLine = (line) => line.startsWith("+") && !line.startsWith("+++");
+const isAddedLine = (line) => line.startsWith("+");
+
+const isCandidateHeader = (line, previous) =>
+  line.startsWith("+++ ") && previous.startsWith("--- ");
 
 const advancesCandidateLine = (line) =>
   !(line.startsWith("-") || line.startsWith("\\"));
@@ -39,9 +42,12 @@ export const parseChangedLines = (patch) => {
   const changed = new Map();
   let file;
   let nextLine;
+  let previous = "";
 
   for (const line of patch.split("\n")) {
-    if (line.startsWith("+++ ")) {
+    const header = isCandidateHeader(line, previous);
+    previous = line;
+    if (header) {
       file = candidateFile(line);
       nextLine = undefined;
       continue;

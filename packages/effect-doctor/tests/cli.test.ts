@@ -43,9 +43,21 @@ const runCliArguments = (arguments_: readonly string[]) =>
   });
 
 const rerunCommand = (output: string): string => {
-  const line = output.split("\n").find((value) => value.startsWith("Rerun: "));
+  const line = output
+    .split("\n")
+    .find((value) => value.startsWith("Rerun (POSIX shell): "));
   expect(line).toBeDefined();
-  return line?.slice("Rerun: ".length) ?? "";
+  return line?.slice("Rerun (POSIX shell): ".length) ?? "";
+};
+
+const rerunArguments = (output: string): readonly string[] => {
+  const line = output
+    .split("\n")
+    .find((value) => value.startsWith("Rerun arguments (JSON): "));
+  expect(line).toBeDefined();
+  return JSON.parse(
+    line?.slice("Rerun arguments (JSON): ".length) ?? "[]"
+  ) as readonly string[];
 };
 
 const executeRerun = (
@@ -83,7 +95,7 @@ const executeRerun = (
 };
 
 describe("Effect Doctor CLI", () => {
-  it("returns one when a finding crosses the blocking threshold", () => {
+  it("returns one when the scan has findings", () => {
     const result = runCli(fixture("invalid"));
     const report = JSON.parse(result.stdout);
 
@@ -95,9 +107,9 @@ describe("Effect Doctor CLI", () => {
           notApplicable: expect.objectContaining({ total: expect.any(Number) }),
         }),
         policy: expect.objectContaining({
-          activeRuleCount: 150,
+          activeRuleCount: 118,
           id: "effect-v4/default",
-          revision: 1,
+          revision: 7,
         }),
         schema: "effect-doctor/scan/v1",
         summary: expect.objectContaining({ errors: 2 }),
@@ -131,6 +143,36 @@ describe("Effect Doctor CLI", () => {
     expect(result.stdout).not.toContain("effectDoctorPrivateMarker.ts");
   }, 30_000);
 
+  it("reports an analyzer timeout as incomplete analysis", () => {
+    const result = runCliArguments([
+      fixture("invalid"),
+      "--format",
+      "json",
+      "--analyzer-timeout",
+      "1 millis",
+    ]);
+    const report = JSON.parse(result.stdout) as {
+      readonly error: { readonly reason: string; readonly tag: string };
+    };
+
+    expect(result.status).toBe(2);
+    expect(report.error).toMatchObject({
+      reason: "timeout",
+      tag: "AnalyzerFailure",
+    });
+  }, 30_000);
+
+  it("rejects an analyzer timeout that is not a duration", () => {
+    const result = runCliArguments([
+      fixture("invalid"),
+      "--analyzer-timeout",
+      "soon",
+    ]);
+
+    expect(result.status).not.toBe(0);
+    expect(`${result.stdout}${result.stderr}`).toMatch(/duration/iu);
+  }, 30_000);
+
   it("explains a rule through the documented fields", () => {
     const ruleId = "effect-doctor/prefer-config-redacted";
     const result = runCliArguments(["rules", "explain", ruleId]);
@@ -140,7 +182,7 @@ describe("Effect Doctor CLI", () => {
     expect(lines[0]).toBe(ruleId);
     expect(lines).toEqual(
       expect.arrayContaining([
-        expect.stringMatching(/^Status: /u),
+        expect.stringMatching(/^Severity: /u),
         expect.stringMatching(/^Category: /u),
         expect.stringMatching(/^Applicability: /u),
         expect.stringMatching(/^Provider fix: /u),
@@ -152,100 +194,93 @@ describe("Effect Doctor CLI", () => {
     );
   });
 
-  it.skipIf(process.platform === "win32")(
-    "renders an executable, injection-safe handoff for coding agents",
-    () => {
-      const workspace = mkdtempSync(
-        join(
-          fileURLToPath(new URL("../../api/tests/fixtures/", import.meta.url)),
-          "effect-doctor-cli-"
-        )
+  it("renders an executable, injection-safe handoff for coding agents", () => {
+    const workspace = mkdtempSync(
+      join(
+        fileURLToPath(new URL("../../api/tests/fixtures/", import.meta.url)),
+        "effect-doctor-cli-"
+      )
+    );
+    const root = join(workspace, "invalid '$(touch sentinel)'");
+    cpSync(fixture("invalid"), root, { recursive: true });
+    renameSync(join(root, "tsconfig.json"), join(root, "--config.json"));
+
+    try {
+      const arguments_ = [root, "--project=--config.json", "--format", "agent"];
+      const result = runCliArguments(arguments_);
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain(
+        "Effect Doctor agent handoff (Effect v4)"
       );
-      const root = join(workspace, "invalid '$(touch sentinel)'");
-      cpSync(fixture("invalid"), root, { recursive: true });
-      renameSync(join(root, "tsconfig.json"), join(root, "--config.json"));
-
-      try {
-        const arguments_ = [
-          root,
-          "--project=--config.json",
-          "--format",
-          "agent",
-          "--blocking",
-          "never",
-        ];
-        const result = runCliArguments(arguments_);
-
-        expect(result.status).toBe(0);
-        expect(result.stdout).toContain(
-          "Effect Doctor agent handoff (Effect v4)"
+      expect(result.stdout).toContain("118 active rules");
+      expect(result.stdout).toContain("diagnostics not applicable");
+      expect(result.stdout).toContain("Project: --config.json");
+      expect(result.stdout).toContain("Scan receipt:");
+      expect(result.stdout).toMatch(
+        /Policy: effect-v4\/default@7 [a-f0-9]{64}/u
+      );
+      expect(result.stdout).toContain("Do not suppress rules");
+      expect(result.stdout).toMatch(/Fingerprint: [a-f0-9]{64}/u);
+      const expectedArguments = [
+        "effect-doctor",
+        root,
+        "--project=--config.json",
+        "--format",
+        "agent",
+      ];
+      expect(rerunArguments(result.stdout)).toEqual(expectedArguments);
+      if (process.platform !== "win32") {
+        expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual(
+          expectedArguments.slice(1)
         );
-        expect(result.stdout).toContain("150 active rules");
-        expect(result.stdout).toContain("diagnostics not applicable");
-        expect(result.stdout).toContain("Project: --config.json");
-        expect(result.stdout).toContain("Scan receipt:");
-        expect(result.stdout).toMatch(
-          /Policy: effect-v4\/default@1 [a-f0-9]{64}/u
-        );
-        expect(result.stdout).toContain("Do not suppress rules");
-        expect(result.stdout).toMatch(/Fingerprint: [a-f0-9]{64}/u);
-        expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual([
-          root,
-          "--project=--config.json",
-          "--format",
-          "agent",
-          "--blocking",
-          "never",
-        ]);
-        expect(existsSync(join(workspace, "sentinel"))).toBe(false);
-        const repeated = runCliArguments(arguments_);
-        expect(repeated.stdout).toBe(result.stdout);
-      } finally {
-        rmSync(workspace, { force: true, recursive: true });
       }
-    },
-    30_000
-  );
+      expect(existsSync(join(workspace, "sentinel"))).toBe(false);
+      const repeated = runCliArguments(arguments_);
+      expect(repeated.stdout).toBe(result.stdout);
+    } finally {
+      rmSync(workspace, { force: true, recursive: true });
+    }
+  }, 30_000);
 
-  it.skipIf(process.platform === "win32")(
-    "preserves one normalized project selector in comparison handoffs",
-    () => {
-      const workspace = mkdtempSync(join(tmpdir(), "effect-doctor-compare-"));
-      const baseline = fixture("invalid");
-      const candidate = fixture("invalid");
-      try {
-        const result = runCliArguments([
-          "compare",
-          baseline,
-          candidate,
-          "--project",
-          "./src/../tsconfig.json",
-          "--format",
-          "agent",
-          "--blocking",
-          "never",
-        ]);
+  it("preserves one normalized project selector in comparison handoffs", () => {
+    const workspace = mkdtempSync(join(tmpdir(), "effect-doctor-compare-"));
+    const baseline = fixture("invalid");
+    const candidate = fixture("invalid");
+    try {
+      const result = runCliArguments([
+        "compare",
+        baseline,
+        candidate,
+        "--project",
+        "./src/../tsconfig.json",
+        "--format",
+        "agent",
+      ]);
 
-        expect(result.status).toBe(0);
-        expect(result.stdout).toContain("Project: tsconfig.json");
-        expect(result.stdout).toContain("Introduced findings: 0");
-        expect(result.stdout).toMatch(
-          /Candidate receipt: 150 active rules; [1-9]\d* applicable findings;/u
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Project: tsconfig.json");
+      expect(result.stdout).toContain("Introduced findings: 0");
+      expect(result.stdout).toMatch(
+        /Candidate receipt: 118 active rules; [1-9]\d* applicable findings;/u
+      );
+      const expectedArguments = [
+        "effect-doctor",
+        "compare",
+        baseline,
+        candidate,
+        "--project=tsconfig.json",
+        "--format",
+        "agent",
+      ];
+      expect(rerunArguments(result.stdout)).toEqual(expectedArguments);
+      if (process.platform !== "win32") {
+        expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual(
+          expectedArguments.slice(1)
         );
-        expect(executeRerun(rerunCommand(result.stdout), workspace)).toEqual([
-          "compare",
-          baseline,
-          candidate,
-          "--project=tsconfig.json",
-          "--format",
-          "agent",
-          "--blocking",
-          "never",
-        ]);
-      } finally {
-        rmSync(workspace, { force: true, recursive: true });
       }
-    },
-    30_000
-  );
+    } finally {
+      rmSync(workspace, { force: true, recursive: true });
+    }
+  }, 30_000);
 });

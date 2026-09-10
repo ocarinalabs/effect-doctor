@@ -35,12 +35,11 @@ const digestRule = {
   id: "effect/example",
   providerRuleId: "example",
   source: "effect-tsgo",
-  status: "blocking",
   title: "Example",
 } satisfies ScanPolicyRule;
 
 const finding = (
-  ruleId: "effect/floating-effect" | "effect/no-nullish",
+  ruleId: "effect/floating-effect" | "effect-doctor/no-module-mocks",
   line: number
 ): Finding => {
   const withoutFingerprint = {
@@ -55,10 +54,12 @@ const finding = (
     provenance: {
       engine: "effect-tsgo",
       nativeRuleId:
-        ruleId === "effect/floating-effect" ? "floatingEffect" : "noNullish",
+        ruleId === "effect/floating-effect"
+          ? "floatingEffect"
+          : "no-module-mocks",
     },
     ruleId,
-    severity: ruleId === "effect/floating-effect" ? "error" : "advice",
+    severity: ruleId === "effect/floating-effect" ? "error" : "warning",
     title: ruleId,
   } satisfies Omit<Finding, "fingerprint">;
   return {
@@ -68,40 +69,42 @@ const finding = (
 };
 
 describe("the fixed Effect v4 scan policy", () => {
-  it("keeps all 150 rules active with the fixed applicability split", () => {
+  it("keeps all 118 rules active with the fixed applicability split", () => {
     const rules = knownRules();
 
-    expect(rules).toHaveLength(150);
+    expect(rules).toHaveLength(118);
     expect(
       rules.filter((rule) => rule.applicability === "always")
-    ).toHaveLength(114);
+    ).toHaveLength(107);
     expect(
       rules.filter((rule) => rule.applicability === "direct-effect-module")
-    ).toHaveLength(36);
-    expect(rules.filter((rule) => rule.status === "blocking")).toHaveLength(19);
+    ).toHaveLength(11);
+    expect(
+      rules.filter((rule) => rule.defaultSeverity === "error")
+    ).toHaveLength(23);
     expect(
       rules
-        .filter((rule) => rule.status === "blocking")
+        .filter((rule) => rule.defaultSeverity === "error")
         .every((rule) => rule.applicability === "always")
     ).toBe(true);
     expect(SCAN_POLICY).toMatchObject({
-      activeRuleCount: 150,
+      activeRuleCount: 118,
       id: "effect-v4/default",
-      revision: 1,
+      revision: 7,
     });
     expect(SCAN_POLICY.digest).toBe(
-      "4f6f047d4fb5b1c85f623439f0836bf1c2268bcd1377afbfb75eae74b15f91bb"
+      "ebd7658237b642c1e0495ff54e437337d66654a806a7d6b76d65be0181f623ed"
     );
   });
 
   it("does not apply broad conventions without a direct Effect module reference", () => {
-    const noNullish = knownRule("effect/no-nullish");
+    const noModuleMocks = knownRule("effect-doctor/no-module-mocks");
 
-    expect(decideRuleApplicability(noNullish, source(false))).toEqual({
+    expect(decideRuleApplicability(noModuleMocks, source(false))).toEqual({
       applicable: false,
       reason: "missing-direct-effect-module-reference",
     });
-    expect(decideRuleApplicability(noNullish, source(true))).toEqual({
+    expect(decideRuleApplicability(noModuleMocks, source(true))).toEqual({
       applicable: true,
     });
   });
@@ -116,7 +119,7 @@ describe("the fixed Effect v4 scan policy", () => {
 
   it("retains applicable findings and accounts for rejected diagnostics", () => {
     const always = finding("effect/floating-effect", 1);
-    const broad = finding("effect/no-nullish", 2);
+    const broad = finding("effect-doctor/no-module-mocks", 2);
 
     expect(applyRuleApplicability([always, broad], [source(false)])).toEqual({
       applicability: {
@@ -127,7 +130,7 @@ describe("the fixed Effect v4 scan policy", () => {
             {
               count: 1,
               reason: "missing-direct-effect-module-reference",
-              ruleId: "effect/no-nullish",
+              ruleId: "effect-doctor/no-module-mocks",
             },
           ],
           total: 1,

@@ -12,12 +12,12 @@ const makeBroadFinding = (): Finding => {
   const finding = {
     ...makeFinding(),
     provenance: {
-      engine: "effect-tsgo",
-      nativeRuleId: "noNullish",
+      engine: "effect-doctor",
+      nativeRuleId: "no-globals",
     },
-    ruleId: "effect/no-nullish",
-    severity: "advice",
-    title: "No Nullish",
+    ruleId: "effect-doctor/no-globals",
+    severity: "warning",
+    title: "No Globals",
   } satisfies Finding;
   const { fingerprint: _fingerprint, ...withoutFingerprint } = finding;
   return {
@@ -46,14 +46,8 @@ const makeScanReport = (
     {
       analyzedFiles: ["src/main.ts"],
       complete: true,
-      engine: "effect-oxlint",
-      version: "0.11.0",
-    },
-    {
-      analyzedFiles: ["src/main.ts"],
-      complete: true,
       engine: "effect-tsgo",
-      version: "0.38.0",
+      version: "0.45.0",
     },
   ],
   findings,
@@ -62,7 +56,6 @@ const makeScanReport = (
   root: ".",
   schema: "effect-doctor/scan/v1",
   summary: {
-    advice: findings.filter((finding) => finding.severity === "advice").length,
     errors: findings.filter((finding) => finding.severity === "error").length,
     warnings: findings.filter((finding) => finding.severity === "warning")
       .length,
@@ -72,10 +65,9 @@ const makeScanReport = (
     projects: ["tsconfig.json"],
   },
   toolchain: {
-    effect: "4.0.0-rc.112",
-    effectOxlint: "0.11.0",
+    effect: "4.0.0-rc.113",
     oxlint: "1.80.0",
-    tsgo: "0.38.0",
+    tsgo: "0.45.0",
     typescript: "7.0.2",
   },
 });
@@ -87,7 +79,7 @@ describe("ScanReportSchema", () => {
     expect(Schema.decodeUnknownSync(ScanReportSchema)(report)).toEqual(report);
   });
 
-  it("rejects a report without all three complete Analyzer Runs", () => {
+  it("rejects a report without both complete Analyzer Runs", () => {
     const report = { ...makeScanReport(), engines: [] };
 
     expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
@@ -191,7 +183,7 @@ describe("ScanReportSchema", () => {
             {
               count: 1,
               reason: "missing-direct-effect-module-reference",
-              ruleId: "effect/no-nullish",
+              ruleId: "effect-doctor/no-globals",
             },
           ],
           total: 1,

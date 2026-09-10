@@ -50,28 +50,24 @@ const runs = positiveInteger("--runs", 7);
 const warmups = nonNegativeInteger("--warmup", 2);
 
 const runSelfScan = () =>
-  spawnSync(
-    process.execPath,
-    [cli, repositoryRoot, "--format", "json", "--blocking", "never"],
-    {
-      cwd: repositoryRoot,
-      encoding: "utf-8",
-      env: {
-        ...process.env,
-        FORCE_COLOR: "0",
-        LC_ALL: "C",
-        NO_COLOR: "1",
-        TZ: "UTC",
-      },
-      timeout: 30_000,
-    }
-  );
+  spawnSync(process.execPath, [cli, repositoryRoot, "--format", "json"], {
+    cwd: repositoryRoot,
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      FORCE_COLOR: "0",
+      LC_ALL: "C",
+      NO_COLOR: "1",
+      TZ: "UTC",
+    },
+    timeout: 30_000,
+  });
 
 const requireSuccessfulScan = (result) => {
   if (result.error !== undefined) {
     throw result.error;
   }
-  if (result.status !== 0) {
+  if (result.status !== 0 && result.status !== 1) {
     throw new Error(
       `Packaged self-scan failed with ${result.status}: ${result.stderr || result.stdout}`
     );
@@ -105,7 +101,7 @@ const p50 = samples[Math.floor(samples.length / 2)];
 
 process.stdout.write(
   `${JSON.stringify({
-    command: "node dist/bin.js . --format json --blocking never",
+    command: "node dist/bin.js . --format json",
     p50Milliseconds: Number(p50.toFixed(1)),
     runs,
     samplesMilliseconds: samples.map((sample) => Number(sample.toFixed(1))),
