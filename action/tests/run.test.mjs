@@ -84,6 +84,13 @@ const optionValue = (arguments_, flag) => {
   return index === -1 ? undefined : arguments_[index + 1];
 };
 
+const diagnostics = (execution) =>
+  JSON.stringify({
+    errorMessage: execution.result.errorMessage,
+    stderr: execution.stderr,
+    stdout: execution.stdout.slice(0, 2000),
+  });
+
 const runAction = ({
   baselineHasProject,
   directory = ".",
@@ -143,6 +150,8 @@ const runAction = ({
     invocations,
     repository,
     result,
+    stderr: execution.stderr,
+    stdout: execution.stdout,
     summary: readFileSync(summaryFile, "utf-8"),
   };
 };
@@ -150,7 +159,7 @@ const runAction = ({
 test("the selected project is shared by baseline and candidate scans", () => {
   const execution = runAction({ baselineHasProject: true });
   try {
-    assert.equal(execution.invocations.length, 1);
+    assert.equal(execution.invocations.length, 1, diagnostics(execution));
     const [args] = execution.invocations;
     assert.equal(args[0], "compare");
     assert.notEqual(args[1], execution.repository);
@@ -168,7 +177,7 @@ test("the selected project is shared by baseline and candidate scans", () => {
 test("a project absent from the baseline falls back to a candidate scan", () => {
   const execution = runAction({ baselineHasProject: false });
   try {
-    assert.equal(execution.invocations.length, 1);
+    assert.equal(execution.invocations.length, 1, diagnostics(execution));
     const [args] = execution.invocations;
     assert.equal(args[0], execution.repository);
     assert.equal(optionValue(args, "--project"), "configs/effect.json");
@@ -187,7 +196,7 @@ test("an option-like project name remains one CLI argument", () => {
     projectInput: "--config.json",
   });
   try {
-    assert.equal(execution.invocations.length, 1);
+    assert.equal(execution.invocations.length, 1, diagnostics(execution));
     assert.equal(
       optionValue(execution.invocations[0], "--project"),
       "--config.json"
