@@ -321,6 +321,37 @@ h1 {
   color: var(--advice);
 }
 
+.docs {
+  display: grid;
+  gap: 3rem;
+  max-width: 44rem;
+  padding: 4rem 1.5rem;
+}
+
+.docs section {
+  display: grid;
+  gap: 1rem;
+}
+
+.docs h2 {
+  border-bottom: 1px dashed var(--line);
+  font-size: 1.125rem;
+  padding-bottom: 0.75rem;
+}
+
+.docs p {
+  color: var(--muted);
+}
+
+.docs p code {
+  color: var(--text);
+  font-size: 0.875em;
+}
+
+.docs pre {
+  font-size: 0.8125rem;
+}
+
 @media (max-width: 40rem) {
   .hero {
     padding-top: 3rem;

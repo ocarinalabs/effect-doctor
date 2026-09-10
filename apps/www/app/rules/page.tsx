@@ -44,7 +44,7 @@ export default function RulesPage() {
         <h1>Rules</h1>
         <p className="lede">
           Effect Doctor runs {rules.length} rules, {tsgoCount} from Effect TSGo
-          and {doctorCount} from Effect Doctor. Advice never fails a scan.
+          and {doctorCount} from Effect Doctor. Every finding is a required fix.
         </p>
       </header>
       {groups.map((group) => (
