@@ -3,17 +3,15 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
-  changesDependencyGraph,
   effectiveScope,
   parseChangedLines,
   rebaseChangedLines,
   safePullRequestScope,
   selectFindings,
-  withinDirectory,
 } from "../diff.mjs";
-import { parseDoctorReport } from "../report.mjs";
+import { parseReportShape } from "../report.mjs";
 
-const scan = parseDoctorReport(
+const scan = parseReportShape(
   readFileSync(new URL("fixtures/scan.json", import.meta.url), "utf-8")
 );
 
@@ -35,6 +33,21 @@ test("unified patches yield candidate-side changed lines", () => {
   assert.deepEqual([...changed.get("src/program.ts")], [6, 7, 12]);
 });
 
+test("an added line that starts with ++ is content, not a file header", () => {
+  const patch = [
+    "diff --git src/counter.ts src/counter.ts",
+    "--- src/counter.ts",
+    "+++ src/counter.ts",
+    "@@ -1,2 +1,3 @@",
+    " let i = 0;",
+    "+++ i;",
+    "+i += 2;",
+  ].join("\n");
+  const changed = parseChangedLines(patch);
+  assert.deepEqual([...changed.keys()], ["src/counter.ts"]);
+  assert.deepEqual([...changed.get("src/counter.ts")], [2, 3]);
+});
+
 test("directory rebasing excludes files outside the project", () => {
   const changed = new Map([
     ["packages/app/src/program.ts", new Set([7])],
@@ -42,14 +55,6 @@ test("directory rebasing excludes files outside the project", () => {
   ]);
   const rebased = rebaseChangedLines(changed, "packages/app");
   assert.deepEqual([...rebased.keys()], ["src/program.ts"]);
-  assert.equal(
-    withinDirectory("packages/app/src/a.ts", "packages/app"),
-    "src/a.ts"
-  );
-  assert.equal(
-    withinDirectory("packages/other/a.ts", "packages/app"),
-    undefined
-  );
 });
 
 test("files scope selects every Finding in changed files", () => {
@@ -73,8 +78,8 @@ test("lines scope selects Findings that begin on changed lines", () => {
     scope: "lines",
   });
   assert.deepEqual(
-    findings.map((finding) => finding.fingerprint),
-    ["first"]
+    findings.map((finding) => finding.ruleId),
+    ["effect-doctor/no-run-sync-on-suspending-effect"]
   );
 });
 
@@ -87,10 +92,13 @@ test("pull requests honor scope while other events analyze the full project", ()
 
 test("dependency and workspace changes avoid a hybrid comparison", () => {
   assert.equal(
-    changesDependencyGraph(new Set(["packages/app/package.json"])),
-    true
+    safePullRequestScope("changed", new Set(["packages/app/package.json"])),
+    "full"
   );
-  assert.equal(changesDependencyGraph(new Set(["pnpm-workspace.yaml"])), true);
+  assert.equal(
+    safePullRequestScope("changed", new Set(["pnpm-workspace.yaml"])),
+    "full"
+  );
   assert.equal(
     safePullRequestScope("changed", new Set(["package-lock.json"])),
     "full"

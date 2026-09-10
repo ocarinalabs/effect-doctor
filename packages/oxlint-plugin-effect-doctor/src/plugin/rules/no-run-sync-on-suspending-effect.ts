@@ -1,9 +1,12 @@
 import { defineRule } from "@oxlint/plugins";
 import type { Context, ESTree } from "@oxlint/plugins";
 
-import { collectImportBindings, unwrapExpression } from "./ast.ts";
-import { EFFECT_IMPORT_BINDINGS, effectExportName } from "./effect-imports.ts";
-import type { EffectImportBinding } from "./effect-imports.ts";
+import { collectImportBindings, unwrapExpression } from "../internal/ast.ts";
+import {
+  EFFECT_IMPORT_BINDINGS,
+  effectExportName,
+} from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
 
 const SYNC_RUNNERS: ReadonlySet<string> = new Set(["runSync", "runSyncExit"]);
 const SUSPENDING_CALLS: ReadonlySet<string> = new Set([

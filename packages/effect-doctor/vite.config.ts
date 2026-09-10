@@ -6,7 +6,6 @@ const externalRuntimeDependencies = [
   "@oxlint/plugins",
   "effect",
   "oxlint",
-  "oxlint-plugin-effect",
   "typescript",
 ];
 
@@ -30,11 +29,12 @@ export default defineConfig({
       clean: false,
       deps: {
         alwaysBundle: ["oxlint-plugin-effect-doctor"],
-        neverBundle: ["@oxlint/plugins"],
+        neverBundle: ["@oxlint/plugins", "effect"],
       },
       dts: false,
       entry: {
-        "internal/doctor-plugin": "../api/src/internal/doctor-plugin.ts",
+        "internal/doctor-plugin":
+          "../api/src/internal/analyzers/doctor-plugin.ts",
       },
       fixedExtension: false,
       platform: "node",

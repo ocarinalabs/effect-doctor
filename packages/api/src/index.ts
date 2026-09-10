@@ -1,17 +1,23 @@
 export {
+  ApplicabilityReportSchema,
   ComparisonReportSchema,
+  SCAN_POLICY,
+  ScanPolicySchema,
   ScanReportSchema,
   compareFindings,
   knownRules,
 } from "@effect-doctor/core";
 export type {
+  ApplicabilityReport,
   AnalyzerRun,
   ComparisonReport,
   Finding,
   FindingDelta,
   FindingSummary,
   RuleMetadata,
+  ScanPolicy,
   ScanReport,
+  ScanTarget,
 } from "@effect-doctor/core";
 export { compareProjects } from "./compare.js";
 export type { CompareRequest } from "./compare.js";

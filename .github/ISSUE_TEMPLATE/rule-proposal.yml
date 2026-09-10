@@ -31,10 +31,9 @@ body:
   - type: dropdown
     id: owner
     attributes:
-      label: Likely diagnostic owner
+      label: Proposed diagnostic owner
       options:
         - Effect TSGo
-        - oxlint-plugin-effect
         - Effect Doctor
         - Unknown
     validations:

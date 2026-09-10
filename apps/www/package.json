@@ -1,0 +1,23 @@
+{
+  "name": "@effect-doctor/www",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun --bun next build",
+    "dev": "bun --bun next dev -p 3000",
+    "start": "bun --bun next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect-doctor/core": "workspace:*",
+    "next": "16.3.4",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.4.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}

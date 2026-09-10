@@ -1,0 +1,88 @@
+[
+  {
+    "query": "run effect doctor on this project and tell me what it finds",
+    "should_trigger": true
+  },
+  {
+    "query": "can you scan the effect app under apps/api for problems before I open the PR?",
+    "should_trigger": true
+  },
+  {
+    "query": "my teammate says my Effect.retry in src/jobs/sync.ts is unbounded, check it and fix it",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm about to finish this Effect v4 service in packages/worker, give it a once-over for anything the type checker wouldn't catch",
+    "should_trigger": true
+  },
+  {
+    "query": "compare this branch against main and list only the new Effect findings",
+    "should_trigger": true
+  },
+  {
+    "query": "lint the effect code in ~/work/billing with effect-doctor, json output, I want to pipe it somewhere",
+    "should_trigger": true
+  },
+  {
+    "query": "something in our Layer setup is leaking a scope, can you run the effect analyzer on it",
+    "should_trigger": true
+  },
+  {
+    "query": "audit src/ for effect anti-patterns, we just migrated to effect 4",
+    "should_trigger": true
+  },
+  {
+    "query": "before I merge, does this Effect code have any resource safety issues? use the doctor",
+    "should_trigger": true
+  },
+  {
+    "query": "we use Effect 4 rc, is there a tool that flags floating effects and unbounded concurrency? run it here",
+    "should_trigger": true
+  },
+  {
+    "query": "what does the effect-doctor/no-run-sync-on-suspending-effect finding in CI mean and is it a false positive?",
+    "should_trigger": true
+  },
+  {
+    "query": "effect doctor says no-globals on my handler, can I disable that rule for this file?",
+    "should_trigger": true
+  },
+  {
+    "query": "run eslint on the project and fix the warnings",
+    "should_trigger": false
+  },
+  {
+    "query": "our app is on effect 3.14, can you check it for problems",
+    "should_trigger": false
+  },
+  {
+    "query": "write an Effect.gen program that fetches a user and retries three times",
+    "should_trigger": false
+  },
+  {
+    "query": "explain what Effect.forkScoped does and when to use it",
+    "should_trigger": false
+  },
+  {
+    "query": "migrate this file from effect v3 to v4",
+    "should_trigger": false
+  },
+  {
+    "query": "how should I structure services and layers in a new effect v4 app?",
+    "should_trigger": false
+  },
+  {
+    "query": "is my doctor appointment scheduler using the right cron syntax?",
+    "should_trigger": false
+  },
+  { "query": "set up oxlint in this react project", "should_trigger": false },
+  {
+    "query": "typecheck the repo and tell me the errors",
+    "should_trigger": false
+  },
+  {
+    "query": "review this PR for security issues, it's a plain express app",
+    "should_trigger": false
+  },
+  { "query": "what does the effect Schema module do?", "should_trigger": false }
+]

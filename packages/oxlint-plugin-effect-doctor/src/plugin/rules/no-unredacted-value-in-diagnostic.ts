@@ -2,24 +2,23 @@ import { defineRule } from "@oxlint/plugins";
 import type { Context, ESTree } from "@oxlint/plugins";
 
 import {
-  bindingForReference,
   collectImportBindings,
-  identifierHasBinding,
   isUnshadowedGlobal,
-  namedMember,
   unwrapExpression,
-} from "./ast.ts";
-import { EFFECT_IMPORT_BINDINGS, effectExportName } from "./effect-imports.ts";
-import type { EffectImportBinding } from "./effect-imports.ts";
+} from "../internal/ast.ts";
+import {
+  EFFECT_IMPORT_BINDINGS,
+  effectExportName,
+} from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
+import {
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type { ModuleBindings } from "../internal/effect-module.ts";
 
-type RedactedImportBinding = "namespace" | "value";
-
-const REDACTED_IMPORT_BINDINGS: ReadonlyMap<string, RedactedImportBinding> =
-  new Map([
-    ["effect:named:Redacted", "namespace"],
-    ["effect/Redacted:namespace", "namespace"],
-    ["effect/Redacted:named:value", "value"],
-  ]);
+const REDACTED_MODULE = defineEffectModule("effect", "Redacted", ["value"]);
 
 const EFFECT_DIAGNOSTIC_FUNCTIONS: ReadonlySet<string> = new Set([
   "annotateCurrentSpan",
@@ -46,19 +45,10 @@ const CONSOLE_LOG_FUNCTIONS: ReadonlySet<string> = new Set([
 
 const isRedactedValueCall = (
   context: Context,
-  bindings: ReadonlyMap<number, RedactedImportBinding>,
+  bindings: ModuleBindings,
   call: ESTree.CallExpression
-): boolean => {
-  const callee = unwrapExpression(call.callee);
-  if (callee.type === "Identifier") {
-    return bindingForReference(context, bindings, callee) === "value";
-  }
-  const valueMember = namedMember(callee, "value");
-  return (
-    valueMember !== undefined &&
-    identifierHasBinding(context, bindings, valueMember.object, "namespace")
-  );
-};
+): boolean =>
+  moduleExportName(context, bindings, REDACTED_MODULE, call.callee) === "value";
 
 const isEffectDiagnosticCall = (
   context: Context,
@@ -103,6 +93,34 @@ const isGlobalErrorConstructor = (
 const MESSAGE =
   "Keep Redacted values wrapped inside logs, errors, and telemetry; reveal them only at a trusted non-diagnostic boundary.";
 
+type DiagnosticScope = {
+  readonly enter: () => void;
+  readonly enterFunction: () => void;
+  readonly exit: () => void;
+  readonly exitFunction: () => void;
+  readonly insideCurrent: () => boolean;
+};
+
+const makeDiagnosticScope = (): DiagnosticScope => {
+  let functionDepth = 0;
+  const diagnosticDepths: number[] = [];
+  return {
+    enter: () => {
+      diagnosticDepths.push(functionDepth);
+    },
+    enterFunction: () => {
+      functionDepth += 1;
+    },
+    exit: () => {
+      diagnosticDepths.pop();
+    },
+    exitFunction: () => {
+      functionDepth -= 1;
+    },
+    insideCurrent: () => diagnosticDepths.includes(functionDepth),
+  };
+};
+
 export const noUnredactedValueInDiagnostic = defineRule({
   meta: {
     docs: {
@@ -113,27 +131,10 @@ export const noUnredactedValueInDiagnostic = defineRule({
   },
   createOnce(context) {
     let effectBindings: ReadonlyMap<number, EffectImportBinding> = new Map();
-    let redactedBindings: ReadonlyMap<number, RedactedImportBinding> =
-      new Map();
-    let functionDepth = 0;
-    const diagnosticDepths: number[] = [];
+    let redactedBindings: ModuleBindings = new Map();
+    const scope = makeDiagnosticScope();
     const diagnosticCalls = new WeakSet<ESTree.CallExpression>();
     const diagnosticConstructors = new WeakSet<ESTree.NewExpression>();
-
-    const enterFunction = () => {
-      functionDepth += 1;
-    };
-    const exitFunction = () => {
-      functionDepth -= 1;
-    };
-    const enterDiagnostic = () => {
-      diagnosticDepths.push(functionDepth);
-    };
-    const exitDiagnostic = () => {
-      diagnosticDepths.pop();
-    };
-    const isInsideCurrentDiagnostic = () =>
-      diagnosticDepths.includes(functionDepth);
 
     return {
       before() {
@@ -141,28 +142,25 @@ export const noUnredactedValueInDiagnostic = defineRule({
           context.sourceCode.ast,
           EFFECT_IMPORT_BINDINGS
         );
-        redactedBindings = collectImportBindings(
-          context.sourceCode.ast,
-          REDACTED_IMPORT_BINDINGS
-        );
+        redactedBindings = collectModuleBindings(context, REDACTED_MODULE);
       },
-      ArrowFunctionExpression: enterFunction,
-      "ArrowFunctionExpression:exit": exitFunction,
-      FunctionDeclaration: enterFunction,
-      "FunctionDeclaration:exit": exitFunction,
-      FunctionExpression: enterFunction,
-      "FunctionExpression:exit": exitFunction,
+      ArrowFunctionExpression: scope.enterFunction,
+      "ArrowFunctionExpression:exit": scope.exitFunction,
+      FunctionDeclaration: scope.enterFunction,
+      "FunctionDeclaration:exit": scope.exitFunction,
+      FunctionExpression: scope.enterFunction,
+      "FunctionExpression:exit": scope.exitFunction,
       CallExpression(node) {
         if (
           isEffectDiagnosticCall(context, effectBindings, node) ||
           isConsoleLogCall(context, node)
         ) {
           diagnosticCalls.add(node);
-          enterDiagnostic();
+          scope.enter();
           return;
         }
         if (
-          isInsideCurrentDiagnostic() &&
+          scope.insideCurrent() &&
           isRedactedValueCall(context, redactedBindings, node)
         ) {
           context.report({
@@ -173,18 +171,18 @@ export const noUnredactedValueInDiagnostic = defineRule({
       },
       "CallExpression:exit"(node) {
         if (diagnosticCalls.has(node)) {
-          exitDiagnostic();
+          scope.exit();
         }
       },
       NewExpression(node) {
         if (isGlobalErrorConstructor(context, node)) {
           diagnosticConstructors.add(node);
-          enterDiagnostic();
+          scope.enter();
         }
       },
       "NewExpression:exit"(node) {
         if (diagnosticConstructors.has(node)) {
-          exitDiagnostic();
+          scope.exit();
         }
       },
     };

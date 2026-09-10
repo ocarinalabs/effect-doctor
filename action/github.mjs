@@ -17,13 +17,18 @@ const runUrl = (context) =>
 const truncate = (value, maximum) =>
   value.length <= maximum ? value : `${value.slice(0, maximum - 1)}…`;
 
+const publicationTarget = (result) => [
+  result.repositoryPrefix ?? result.directory,
+  result.target.entry,
+];
+
 const publishStatus = async ({ core, context, github, result }) => {
   const pullRequest = context.payload.pull_request;
   const sha = pullRequest?.head?.sha ?? context.sha;
   try {
     await github.rest.repos.createCommitStatus({
       ...context.repo,
-      context: statusContext(result.repositoryPrefix ?? result.directory),
+      context: statusContext(...publicationTarget(result)),
       description: truncate(statusDescription(result), 140),
       sha,
       state: result.completed && !result.blocked ? "success" : "failure",
@@ -42,7 +47,7 @@ const publishComment = async ({ core, context, github, result }) => {
     return;
   }
   const body = renderSummary(result);
-  const marker = commentMarker(result.repositoryPrefix ?? result.directory);
+  const marker = commentMarker(...publicationTarget(result));
   try {
     const comments = await github.paginate(github.rest.issues.listComments, {
       ...context.repo,
@@ -74,9 +79,9 @@ const publishComment = async ({ core, context, github, result }) => {
 const pullRequestPath = (prefix, file) =>
   prefix === "." ? file : `${prefix}/${file}`;
 
-export const inlineReviewComments = (result, maximum = 25) => {
+const inlineReviewComments = (result, maximum = 25) => {
   const comments = [];
-  const marker = reviewMarker(result.repositoryPrefix ?? result.directory);
+  const marker = reviewMarker(...publicationTarget(result));
   for (const finding of result.findings) {
     const changed = result.changedLines[finding.location.file] ?? [];
     if (!changed.includes(finding.location.start.line)) {
@@ -110,9 +115,7 @@ const previousReviewComments = async ({ context, github, result }) => {
   return comments.filter(
     (comment) =>
       comment.user?.type === "Bot" &&
-      comment.body?.includes(
-        reviewMarker(result.repositoryPrefix ?? result.directory)
-      )
+      comment.body?.includes(reviewMarker(...publicationTarget(result)))
   );
 };
 

@@ -2,33 +2,62 @@
   "schema": "effect-doctor/scan/v1",
   "kind": "scan",
   "doctorVersion": "0.1.0",
-  "findings": [
+  "engines": [
     {
-      "category": "correctness",
-      "evidence": "Effect.runSync(program)",
-      "fingerprint": "first",
-      "location": {
-        "file": "src/program.ts",
-        "start": { "line": 7, "column": 3 },
-        "end": { "line": 7, "column": 26 }
-      },
-      "message": "This Effect can suspend and cannot be run synchronously.",
-      "provenance": {
-        "engine": "effect-doctor",
-        "nativeRuleId": "no-run-sync-on-suspending-effect"
-      },
-      "ruleId": "effect-doctor/no-run-sync-on-suspending-effect",
-      "severity": "error",
-      "title": "Avoid runSync for suspending Effects"
+      "analyzedFiles": ["src/log.ts", "src/program.ts"],
+      "complete": true,
+      "engine": "effect-doctor",
+      "version": "0.1.0"
     },
+    {
+      "analyzedFiles": ["src/log.ts", "src/program.ts"],
+      "complete": true,
+      "engine": "effect-tsgo",
+      "version": "0.40.0"
+    }
+  ],
+  "policy": {
+    "activeRuleCount": 157,
+    "digest": "6e0f588e8d06811cce35190d3adc31f2eca4932912144b77822b393cbe09cd23",
+    "id": "effect-v4/default",
+    "revision": 3
+  },
+  "applicability": {
+    "files": [
+      {
+        "directEffectModuleReference": true,
+        "file": "src/log.ts"
+      },
+      {
+        "directEffectModuleReference": true,
+        "file": "src/program.ts"
+      }
+    ],
+    "normalizedDiagnosticCount": 3,
+    "notApplicable": {
+      "groups": [],
+      "total": 0
+    }
+  },
+  "target": {
+    "entry": "tsconfig.json",
+    "projects": ["tsconfig.json"]
+  },
+  "findings": [
     {
       "category": "effect-native",
       "evidence": "console.log(value)",
-      "fingerprint": "second",
+      "fingerprint": "3d628487684e5c23f373400c154bfbf5271d708978a97002409fd80863fcd7c1",
       "location": {
         "file": "src/log.ts",
-        "start": { "line": 4, "column": 1 },
-        "end": { "line": 4, "column": 19 }
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 19
+        }
       },
       "message": "Use Effect logging with structured fields.",
       "provenance": {
@@ -40,13 +69,43 @@
       "title": "Prefer structured Effect logging"
     },
     {
-      "category": "style",
-      "evidence": "const task = Effect.succeed(1)",
-      "fingerprint": "third",
+      "category": "correctness",
+      "evidence": "Effect.runSync(program)",
+      "fingerprint": "9f17dd71c86bf03b1f87aacf1a79f7f2cf30504e87508625387977577f2d419b",
       "location": {
         "file": "src/program.ts",
-        "start": { "line": 12, "column": 1 },
-        "end": { "line": 12, "column": 31 }
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 26
+        }
+      },
+      "message": "This Effect can suspend and cannot be run synchronously.",
+      "provenance": {
+        "engine": "effect-doctor",
+        "nativeRuleId": "no-run-sync-on-suspending-effect"
+      },
+      "ruleId": "effect-doctor/no-run-sync-on-suspending-effect",
+      "severity": "error",
+      "title": "Avoid runSync for suspending Effects"
+    },
+    {
+      "category": "style",
+      "evidence": "const task = Effect.succeed(1)",
+      "fingerprint": "f7b1158253e80ca1358c40478352b297ea87d08149a6d729268cc6023aeda8b7",
+      "location": {
+        "file": "src/program.ts",
+        "start": {
+          "line": 12,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 31
+        }
       },
       "message": "Name reusable Effect values with an Effect suffix.",
       "provenance": {
@@ -54,8 +113,19 @@
         "nativeRuleId": "consistent-effect-fn-name"
       },
       "ruleId": "effect-doctor/consistent-effect-fn-name",
-      "severity": "advice",
+      "severity": "warning",
       "title": "Use consistent Effect names"
     }
-  ]
+  ],
+  "root": ".",
+  "summary": {
+    "errors": 1,
+    "warnings": 2
+  },
+  "toolchain": {
+    "effect": "4.0.0-rc.113",
+    "oxlint": "1.80.0",
+    "tsgo": "0.40.0",
+    "typescript": "7.0.2"
+  }
 }

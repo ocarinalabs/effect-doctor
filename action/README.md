@@ -23,7 +23,7 @@ jobs:
       [
         { uses: actions/checkout@v5, with: { fetch-depth: 0 } },
         { run: npm ci },
-        { uses: ocarinalabs/effect-doctor@v1, with: { blocking: error } },
+        { uses: ocarinalabs/effect-doctor@v0.1.0 },
       ]
 ```
 
@@ -34,8 +34,8 @@ Install the project before the scan. Type-aware checks need the same packages as
 | Input | Default | Meaning |
 | --- | --- | --- |
 | `directory` | `.` | Effect v4 project directory |
+| `project` | `tsconfig.json` | TypeScript project file relative to `directory` |
 | `scope` | `changed` | `changed`, `files`, `lines`, or `full` |
-| `blocking` | `none` | `none`, `warning`, or `error` |
 | `comment` | `true` | Maintain one pull request summary |
 | `review-comments` | `true` | Comment on Findings located on changed lines |
 | `commit-status` | `true` | Publish an `Effect Doctor` commit status |
@@ -44,13 +44,13 @@ Install the project before the scan. Type-aware checks need the same packages as
 
 On non-pull-request events, every scope behaves as `full`.
 
-The `changed` scope compares the base with the head and reports new Findings. The `files` scope reports all Findings in files that the pull request changes. The `lines` scope reports Findings that start on new or edited lines. The `full` scope reports the full head scan.
+The `changed` scope compares the base with the head and reports new Findings. Both checkouts use the selected `project`. If that project does not exist in the base, the Action reports a full head scan instead. The `files` scope reports all Findings in files that the pull request changes. The `lines` scope reports Findings that start on new or edited lines. The `full` scope reports the full head scan.
 
-The Action writes notes and a job summary before it checks the block level. If GitHub denies write access, the scan still runs and logs a warning.
+The Action writes review comments and a job summary, then fails the job when the selected scope has Findings. If GitHub denies write access, the scan still runs and logs a warning.
 
 ## Outputs
 
-`completed`, `total-findings`, `resolved-findings`, `error-count`, `warning-count`, `advice-count`, and `affected-files` are available to later workflow steps.
+`completed`, `total-findings`, `resolved-findings`, `error-count`, `warning-count`, and `affected-files` are available to later workflow steps.
 
 ## Baseline dependency model
 

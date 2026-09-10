@@ -144,13 +144,6 @@ vite.config.ts.timestamp-*
 
 # Project tooling
 .DS_Store
-.fallow/
+CODEX.md
 .turbo/
 .verification/
-.vale/*
-!.vale/config/
-.vale/config/*
-!.vale/config/vocabularies/
-.vale/config/vocabularies/*
-!.vale/config/vocabularies/EffectDoctor/
-!.vale/config/vocabularies/EffectDoctor/accept.txt

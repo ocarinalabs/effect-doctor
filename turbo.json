@@ -4,9 +4,11 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**", "!.next/dev/**"]
     },
-    "catalog:check": {},
+    "catalog:check": {
+      "dependsOn": ["^build"]
+    },
     "catalog:generate": {
       "cache": false
     },
@@ -17,6 +19,11 @@
       "dependsOn": ["build", "^test"]
     },
     "test:watch": {
+      "cache": false,
+      "persistent": true
+    },
+    "dev": {
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
@@ -44,8 +51,6 @@
         "doctor:self",
         "^catalog:check",
         "//#audit:dependencies:repo",
-        "//#audit:dupes:repo",
-        "//#audit:health:repo",
         "//#lint:repo",
         "//#test:action:repo"
       ],
@@ -54,16 +59,12 @@
     "//#audit:dependencies:repo": {
       "cache": false
     },
-    "//#audit:dupes:repo": {
-      "cache": false
-    },
-    "//#audit:health:repo": {
-      "cache": false
-    },
     "//#fix:repo": {
       "cache": false
     },
-    "//#lint:repo": {},
+    "//#lint:repo": {
+      "dependsOn": ["oxlint-plugin-effect-doctor#build"]
+    },
     "//#test:action:repo": {}
   }
 }

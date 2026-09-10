@@ -1,4 +1,5 @@
-import { Effect, logInfo } from "effect";
+import { Effect } from "effect";
+import { logInfo } from "effect/Effect";
 
 const payload = { jobId: "job-1", status: "complete" };
 

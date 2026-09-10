@@ -2,8 +2,10 @@ import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -33,6 +35,15 @@ const npmCli = join(
 const npmCommand = process.platform === "win32" ? process.execPath : "npm";
 const npmArguments = (arguments_: readonly string[]): readonly string[] =>
   process.platform === "win32" ? [npmCli, ...arguments_] : arguments_;
+
+const installPeerEffect = (extractedPackage: string): void => {
+  mkdirSync(join(extractedPackage, "node_modules"));
+  symlinkSync(
+    realpathSync(join(packageRoot, "node_modules", "effect")),
+    join(extractedPackage, "node_modules", "effect"),
+    "dir"
+  );
+};
 
 describe.sequential("the packed Oxlint plugin", () => {
   it("loads from its npm archive in real Oxlint", () => {
@@ -70,12 +81,19 @@ describe.sequential("the packed Oxlint plugin", () => {
       );
       expect(extracted.error).toBeUndefined();
       expect(extracted.status, extracted.stderr).toBe(0);
+      expect(
+        readFileSync(join(extractedPackage, "LICENSE.oxlint-plugins"), "utf-8")
+      ).toContain("Copyright (c) 2024-present VoidZero Inc. & Contributors");
+      expect(
+        readFileSync(join(extractedPackage, "THIRD_PARTY_NOTICES.md"), "utf-8")
+      ).toContain("cevr/effect-oxlint");
+      installPeerEffect(extractedPackage);
 
       const plugin = join(extractedPackage, "dist", "index.js");
       const source = join(workspace, "source.ts");
       writeFileSync(
         source,
-        'import { Config } from "effect";\nexport const apiKey = Config.string("API_KEY");\n'
+        'import { Config } from "effect";\nexport const apiKey = Config.String("API_KEY");\n'
       );
       const config = join(workspace, "oxlint.config.json");
       writeFileSync(

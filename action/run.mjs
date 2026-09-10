@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -21,15 +23,16 @@ import {
 } from "./diff.mjs";
 import {
   annotationCommand,
-  blocks,
   metricsFor,
   messageCommand,
   outputValues,
-  parseDoctorReport,
+  parseReportShape,
   renderSummary,
 } from "./report.mjs";
 
-const workspace = realpathSync(process.env.GITHUB_WORKSPACE ?? process.cwd());
+const workspace = realpathSync.native(
+  process.env.GITHUB_WORKSPACE ?? process.cwd()
+);
 const runnerTemp = process.env.RUNNER_TEMP ?? os.tmpdir();
 const outputFile = process.env.GITHUB_OUTPUT;
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -84,41 +87,87 @@ const packageSpec = (version) => {
   ) {
     return version;
   }
-  if (version.startsWith("@ocarinalabs/effect-doctor@")) {
+  if (version.startsWith("dr-effect@")) {
     return version;
   }
-  return `@ocarinalabs/effect-doctor@${version}`;
+  return `dr-effect@${version}`;
+};
+
+const npmCli = path.join(
+  path.dirname(process.execPath),
+  "node_modules",
+  "npm",
+  "bin",
+  "npm-cli.js"
+);
+
+const runNpm = (args) =>
+  process.platform === "win32" && existsSync(npmCli)
+    ? run(process.execPath, [npmCli, ...args])
+    : run("npm", args, { shell: process.platform === "win32" });
+
+const packageDirectories = (modulesDirectory) => {
+  if (!existsSync(modulesDirectory)) {
+    return [];
+  }
+  return readdirSync(modulesDirectory)
+    .filter((name) => !name.startsWith("."))
+    .flatMap((name) =>
+      name.startsWith("@")
+        ? readdirSync(path.join(modulesDirectory, name)).map((scoped) =>
+            path.join(modulesDirectory, name, scoped)
+          )
+        : [path.join(modulesDirectory, name)]
+    );
+};
+
+const doctorScript = (prefix) => {
+  for (const directory of packageDirectories(
+    path.join(prefix, "node_modules")
+  )) {
+    const manifestPath = path.join(directory, "package.json");
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const bin =
+      typeof manifest.bin === "string"
+        ? manifest.bin
+        : manifest.bin?.["effect-doctor"];
+    if (typeof bin === "string") {
+      return path.join(directory, bin);
+    }
+  }
+  return undefined;
 };
 
 const installDoctor = (version) => {
   const spec = packageSpec(version);
   const identity = createHash("sha256").update(spec).digest("hex").slice(0, 16);
   const prefix = path.join(runnerTemp, `effect-doctor-toolchain-${identity}`);
-  const executable = path.join(
-    prefix,
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "effect-doctor.cmd" : "effect-doctor"
-  );
-  if (!existsSync(executable)) {
-    mkdirSync(prefix, { recursive: true });
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    const installation = run(npm, [
-      "install",
-      "--prefix",
-      prefix,
-      "--no-save",
-      "--no-audit",
-      "--no-fund",
-      spec,
-    ]);
-    if (installation.status !== 0) {
-      throw new Error(
-        installation.stderr.trim() || `Could not install ${spec}`
-      );
-    }
+  const installed = doctorScript(prefix);
+  if (installed !== undefined) {
+    return installed;
   }
-  return executable;
+  mkdirSync(prefix, { recursive: true });
+  const installation = runNpm([
+    "install",
+    "--prefix",
+    prefix,
+    "--no-save",
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+    spec,
+  ]);
+  if (installation.status !== 0) {
+    throw new Error(installation.stderr.trim() || `Could not install ${spec}`);
+  }
+  const script = doctorScript(prefix);
+  if (script === undefined) {
+    throw new Error(`Installed ${spec} without an effect-doctor executable`);
+  }
+  return script;
 };
 
 const ensureCommit = (root, sha) => {
@@ -251,18 +300,14 @@ const makeBaseline = (repositoryRoot, candidate, prefix, baseSha) => {
   };
 };
 
-const runDoctor = (executable, args) => {
-  const result = run(
-    executable,
-    [...args, "--format", "json", "--blocking", "never"],
-    {
-      env: {
-        ...process.env,
-        NO_COLOR: "1",
-      },
-    }
-  );
-  if (result.status !== 0) {
+const runDoctor = (script, args) => {
+  const result = run(process.execPath, [script, ...args, "--format", "json"], {
+    env: {
+      ...process.env,
+      NO_COLOR: "1",
+    },
+  });
+  if (result.status !== 0 && result.status !== 1) {
     throw new Error(
       result.stdout.trim() ||
         result.stderr.trim() ||
@@ -279,7 +324,6 @@ const appendOutput = (name, value) => {
 };
 
 const emptyMetrics = () => ({
-  adviceCount: 0,
   affectedFiles: 0,
   errorCount: 0,
   resolvedCount: 0,
@@ -329,12 +373,8 @@ const emitResult = (result) => {
 };
 
 const readActionRequest = () => ({
-  blocking: normalizeChoice(
-    input("blocking", "none"),
-    ["none", "warning", "error"],
-    "blocking"
-  ),
   directoryInput: input("directory", "."),
+  projectInput: input("project", "tsconfig.json"),
   requestedScope: normalizeChoice(
     input("scope", "changed"),
     ["changed", "files", "lines", "full"],
@@ -344,21 +384,39 @@ const readActionRequest = () => ({
   version: input("version", "0.1.0"),
 });
 
-const resolveProject = (directoryInput) => {
+const projectEntry = (directory, projectInput) => {
+  if (path.isAbsolute(projectInput) || projectInput.includes("\\")) {
+    throw new Error("project must be a POSIX path relative to directory");
+  }
+  const project = path.resolve(directory, projectInput);
+  const relative = path.relative(directory, project);
+  if (
+    relative === "" ||
+    relative === ".." ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error("project must name a file inside directory");
+  }
+  return relative.replaceAll(path.sep, "/");
+};
+
+const resolveProject = (directoryInput, projectInput) => {
   const requestedDirectory = path.resolve(workspace, directoryInput);
   const directory = existsSync(requestedDirectory)
-    ? realpathSync(requestedDirectory)
+    ? realpathSync.native(requestedDirectory)
     : requestedDirectory;
   if (!existsSync(directory)) {
     throw new Error(`Project directory does not exist: ${directoryInput}`);
   }
-  const repositoryRoot = realpathSync(
+  const repositoryRoot = realpathSync.native(
     checkedGit(directory, ["rev-parse", "--show-toplevel"])
   );
   return {
     directory,
     prefix: scanPrefix(repositoryRoot, directory),
     repositoryRoot,
+    targetEntry: projectEntry(directory, projectInput),
   };
 };
 
@@ -432,28 +490,43 @@ const analyzeProject = ({
   prefix,
   repositoryRoot,
   scope,
+  targetEntry,
 }) => {
   if (scope !== "changed") {
-    return runDoctor(executable, [directory]);
+    return {
+      reportSource: runDoctor(executable, [
+        directory,
+        `--project=${targetEntry}`,
+      ]),
+      scope,
+    };
   }
   const baseline = makeBaseline(repositoryRoot, directory, prefix, baseSha);
   try {
-    if (!existsSync(path.join(baseline.baseline, "tsconfig.json"))) {
-      return runDoctor(executable, [directory]);
+    if (!existsSync(path.join(baseline.baseline, targetEntry))) {
+      return {
+        reportSource: runDoctor(executable, [
+          directory,
+          `--project=${targetEntry}`,
+        ]),
+        scope: "full",
+      };
     }
-    return runDoctor(executable, ["compare", baseline.baseline, directory]);
+    return {
+      reportSource: runDoctor(executable, [
+        "compare",
+        baseline.baseline,
+        directory,
+        `--project=${targetEntry}`,
+      ]),
+      scope,
+    };
   } finally {
     baseline.cleanup();
   }
 };
 
-const completedResult = ({
-  blocking,
-  changes,
-  directoryInput,
-  parsed,
-  prefix,
-}) => {
+const completedResult = ({ changes, directoryInput, parsed, prefix }) => {
   const findings = selectFindings({
     changedFiles: changes.changedFiles,
     changedLines: changes.changedLines,
@@ -463,59 +536,92 @@ const completedResult = ({
   const resolved = changes.scope === "changed" ? parsed.resolved : [];
   const metrics = metricsFor(findings, resolved);
   return {
-    blocked: blocks(metrics, blocking),
-    blocking,
+    blocked: metrics.totalCount > 0,
     changedLines: serializeChangedLines(changes.changedLines),
     completed: true,
     directory: directoryInput,
     doctorVersion: parsed.report.doctorVersion,
+    engines: parsed.engines,
     findings,
+    applicability: parsed.applicability,
     metrics,
+    policy: parsed.policy,
     repositoryPrefix: prefix,
     resolved,
     scope: changes.scope,
+    target: parsed.target,
+    toolchain: parsed.toolchain,
   };
 };
 
 const main = () => {
   const request = readActionRequest();
-  const project = resolveProject(request.directoryInput);
-  const baseSha = process.env.GITHUB_BASE_SHA;
-  const changes = resolveChanges({
-    baseSha,
-    eventName: process.env.GITHUB_EVENT_NAME,
-    prefix: project.prefix,
-    repositoryRoot: project.repositoryRoot,
-    requestedScope: request.requestedScope,
-    reviewComments: request.reviewComments,
-  });
-  const executable = installDoctor(request.version);
-  const reportSource = analyzeProject({
-    baseSha,
-    directory: project.directory,
-    executable,
-    prefix: project.prefix,
-    repositoryRoot: project.repositoryRoot,
-    scope: changes.scope,
-  });
-  const parsed = parseDoctorReport(reportSource);
-  emitResult(
-    completedResult({
-      blocking: request.blocking,
-      changes,
+  const project = resolveProject(request.directoryInput, request.projectInput);
+  let result;
+  try {
+    const baseSha = process.env.GITHUB_BASE_SHA;
+    const changes = resolveChanges({
+      baseSha,
+      eventName: process.env.GITHUB_EVENT_NAME,
+      prefix: project.prefix,
+      repositoryRoot: project.repositoryRoot,
+      requestedScope: request.requestedScope,
+      reviewComments: request.reviewComments,
+    });
+    const executable = installDoctor(request.version);
+    const analysis = analyzeProject({
+      baseSha,
+      directory: project.directory,
+      executable,
+      prefix: project.prefix,
+      repositoryRoot: project.repositoryRoot,
+      scope: changes.scope,
+      targetEntry: project.targetEntry,
+    });
+    const parsed = parseReportShape(analysis.reportSource);
+    result = completedResult({
+      changes: { ...changes, scope: analysis.scope },
       directoryInput: request.directoryInput,
       parsed,
       prefix: project.prefix,
-    })
-  );
+    });
+  } catch (error) {
+    result = {
+      blocked: true,
+      changedLines: {},
+      completed: false,
+      directory: request.directoryInput,
+      doctorVersion: undefined,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      findings: [],
+      metrics: emptyMetrics(),
+      repositoryPrefix: project.prefix,
+      resolved: [],
+      scope: request.requestedScope,
+      target: {
+        entry: project.targetEntry,
+        projects: [project.targetEntry],
+      },
+    };
+  }
+  emitResult(result);
 };
+
+const fallbackTarget = () => {
+  const entry = path.posix.normalize(
+    input("project", "tsconfig.json").replaceAll("\\", "/")
+  );
+  return { entry, projects: [entry] };
+};
+
+const fallbackDirectory = () =>
+  path.posix.normalize(input("directory", ".").replaceAll("\\", "/"));
 
 try {
   main();
 } catch (error) {
   emitResult({
     blocked: true,
-    blocking: input("blocking", "none"),
     changedLines: {},
     completed: false,
     directory: input("directory", "."),
@@ -523,8 +629,9 @@ try {
     errorMessage: error instanceof Error ? error.message : String(error),
     findings: [],
     metrics: emptyMetrics(),
-    repositoryPrefix: ".",
+    repositoryPrefix: fallbackDirectory(),
     resolved: [],
     scope: input("scope", "changed"),
+    target: fallbackTarget(),
   });
 }

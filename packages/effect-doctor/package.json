@@ -1,5 +1,5 @@
 {
-  "name": "@ocarinalabs/effect-doctor",
+  "name": "dr-effect",
   "version": "0.1.0",
   "description": "Deterministic Effect TypeScript diagnostics for humans and coding-agent evaluations.",
   "keywords": [
@@ -21,6 +21,8 @@
   "files": [
     "dist",
     "LICENSE",
+    "LICENSE.effect-tsgo",
+    "LICENSE.oxlint-plugins",
     "README.md"
   ],
   "type": "module",
@@ -39,7 +41,7 @@
   "scripts": {
     "bench": "bun run build && node scripts/benchmark.mjs",
     "build": "vp pack",
-    "doctor:self": "node dist/bin.js ../.. --format json --blocking never",
+    "doctor:self": "node dist/bin.js ../.. --format json",
     "test": "vp test run",
     "test:watch": "vp test",
     "typecheck": "tsc --noEmit",
@@ -47,12 +49,12 @@
     "verify:release": "npm pack --dry-run"
   },
   "dependencies": {
-    "@effect/platform-node": "4.0.0-rc.112",
-    "@effect/tsgo": "0.38.0",
-    "@oxlint/plugins": "1.80.0",
-    "effect": "4.0.0-rc.112",
-    "oxlint": "1.80.0",
-    "oxlint-plugin-effect": "0.11.0",
+    "@effect/platform-node": "4.0.0-rc.113",
+    "@effect/platform-node-shared": "4.0.0-rc.113",
+    "@effect/tsgo": "0.45.0",
+    "@oxlint/plugins": "1.82.0",
+    "effect": "4.0.0-rc.113",
+    "oxlint": "1.82.0",
     "typescript": "7.0.2"
   },
   "devDependencies": {

@@ -1,5 +1,16 @@
 import type { Rule } from "@oxlint/plugins";
 
+import {
+  noManagedRuntimeInEffect,
+  noModuleMocks,
+  noSequentialEffectAll,
+  noUnboundedConcurrency,
+  preferCatchTag,
+  preferEffectFn,
+  preferMatchTagsExhaustive,
+  preferPredicateIsTagged,
+  requireNamedEffectFn,
+} from "../../vendor/cevr-effect-oxlint/rules/index.js";
 import type { EffectDoctorRuleId } from "../rules.ts";
 import { consistentEffectFnName } from "./rules/consistent-effect-fn-name.ts";
 import { noDuplicateLayerFactoryCall } from "./rules/no-duplicate-layer-factory-call.ts";
@@ -17,7 +28,7 @@ import { preferConfigRedacted } from "./rules/prefer-config-redacted.ts";
 import { preferHttpJsonResponse } from "./rules/prefer-http-json-response.ts";
 import { preferStructuredLogData } from "./rules/prefer-structured-log-data.ts";
 
-export const ruleRegistry = {
+const authoredRules = {
   "consistent-effect-fn-name": consistentEffectFnName,
   "no-duplicate-layer-factory-call": noDuplicateLayerFactoryCall,
   "no-inline-schema-compile": noInlineSchemaCompile,
@@ -33,4 +44,24 @@ export const ruleRegistry = {
   "prefer-config-redacted": preferConfigRedacted,
   "prefer-http-json-response": preferHttpJsonResponse,
   "prefer-structured-log-data": preferStructuredLogData,
+} satisfies Readonly<Record<string, Rule>>;
+
+const adoptedRules = {
+  "no-managed-runtime-in-effect": noManagedRuntimeInEffect,
+  "no-module-mocks": noModuleMocks,
+  "no-sequential-effect-all": noSequentialEffectAll,
+  "no-unbounded-concurrency": noUnboundedConcurrency,
+  "prefer-catch-tag": preferCatchTag,
+  "prefer-effect-fn": preferEffectFn,
+  "prefer-match-tags-exhaustive": preferMatchTagsExhaustive,
+  "prefer-predicate-is-tagged": preferPredicateIsTagged,
+  "require-named-effect-fn": requireNamedEffectFn,
+} satisfies Readonly<Record<string, Rule>>;
+
+export const ruleRegistry = {
+  ...adoptedRules,
+  ...authoredRules,
 } satisfies Readonly<Record<EffectDoctorRuleId, Rule>>;
+
+export type AuthoredRuleId = keyof typeof authoredRules;
+export type AdoptedRuleId = keyof typeof adoptedRules;

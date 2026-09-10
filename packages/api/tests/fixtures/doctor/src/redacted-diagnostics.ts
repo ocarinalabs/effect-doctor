@@ -1,4 +1,5 @@
 import { Effect, Redacted } from "effect";
+import * as EffectPackage from "effect";
 import {
   annotateCurrentSpan as annotateSpan,
   logError as reportEffectError,
@@ -43,6 +44,11 @@ export const spanAnnotationLeak = Effect.annotateSpans(
 export const currentSpanAnnotationLeak = annotateSpan({
   token: revealSecret(secret),
 });
+
+export const packageLogLeak = EffectPackage.Effect.logInfo(
+  "api token",
+  EffectPackage.Redacted.value(secret)
+);
 
 export const wrappedEffectLog = Effect.logInfo("api token", secret);
 export const wrappedAnnotation = Effect.annotateLogs(Effect.void, {

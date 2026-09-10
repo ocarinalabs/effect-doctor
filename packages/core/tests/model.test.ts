@@ -2,11 +2,39 @@ import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type { Finding } from "../src/finding.js";
+import { fingerprintFinding } from "../src/fingerprint.js";
+import { SCAN_POLICY } from "../src/policy.js";
 import { ComparisonReportSchema, ScanReportSchema } from "../src/report.js";
 import type { ScanReport } from "../src/report.js";
 import { makeFinding } from "./support/make-finding.js";
 
-const makeScanReport = (findings: readonly Finding[] = []): ScanReport => ({
+const makeBroadFinding = (): Finding => {
+  const finding = {
+    ...makeFinding(),
+    provenance: {
+      engine: "effect-doctor",
+      nativeRuleId: "no-globals",
+    },
+    ruleId: "effect-doctor/no-globals",
+    severity: "warning",
+    title: "No Globals",
+  } satisfies Finding;
+  const { fingerprint: _fingerprint, ...withoutFingerprint } = finding;
+  return {
+    ...withoutFingerprint,
+    fingerprint: fingerprintFinding(withoutFingerprint),
+  };
+};
+
+const makeScanReport = (
+  findings: readonly Finding[] = [],
+  directEffectModuleReference = true
+): ScanReport => ({
+  applicability: {
+    files: [{ directEffectModuleReference, file: "src/main.ts" }],
+    normalizedDiagnosticCount: findings.length,
+    notApplicable: { groups: [], total: 0 },
+  },
   doctorVersion: "0.1.0",
   engines: [
     {
@@ -18,31 +46,28 @@ const makeScanReport = (findings: readonly Finding[] = []): ScanReport => ({
     {
       analyzedFiles: ["src/main.ts"],
       complete: true,
-      engine: "effect-oxlint",
-      version: "0.11.0",
-    },
-    {
-      analyzedFiles: ["src/main.ts"],
-      complete: true,
       engine: "effect-tsgo",
-      version: "0.38.0",
+      version: "0.45.0",
     },
   ],
   findings,
   kind: "scan",
+  policy: SCAN_POLICY,
   root: ".",
   schema: "effect-doctor/scan/v1",
   summary: {
-    advice: findings.filter((finding) => finding.severity === "advice").length,
     errors: findings.filter((finding) => finding.severity === "error").length,
     warnings: findings.filter((finding) => finding.severity === "warning")
       .length,
   },
+  target: {
+    entry: "tsconfig.json",
+    projects: ["tsconfig.json"],
+  },
   toolchain: {
-    effect: "4.0.0-rc.112",
-    effectOxlint: "0.11.0",
+    effect: "4.0.0-rc.113",
     oxlint: "1.80.0",
-    tsgo: "0.38.0",
+    tsgo: "0.45.0",
     typescript: "7.0.2",
   },
 });
@@ -54,7 +79,7 @@ describe("ScanReportSchema", () => {
     expect(Schema.decodeUnknownSync(ScanReportSchema)(report)).toEqual(report);
   });
 
-  it("rejects a report without all three complete Analyzer Runs", () => {
+  it("rejects a report without both complete Analyzer Runs", () => {
     const report = { ...makeScanReport(), engines: [] };
 
     expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
@@ -115,6 +140,18 @@ describe("ScanReportSchema", () => {
     expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
   });
 
+  it("rejects a target that omits its entry project", () => {
+    const report = {
+      ...makeScanReport(),
+      target: {
+        entry: "tsconfig.json",
+        projects: ["packages/app/tsconfig.json"],
+      },
+    };
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
+
   it("rejects a finding outside the provider inventory", () => {
     const report = makeScanReport([makeFinding({ file: "src/other.ts" })]);
 
@@ -124,6 +161,35 @@ describe("ScanReportSchema", () => {
   it("rejects a finding with a forged fingerprint", () => {
     const finding = { ...makeFinding(), fingerprint: "forged" };
     const report = makeScanReport([finding]);
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
+
+  it("rejects a broad finding when its source has no direct Effect module reference", () => {
+    const report = makeScanReport([makeBroadFinding()], false);
+
+    expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
+  });
+
+  it("rejects an applicability receipt that does not reconcile with findings", () => {
+    const valid = makeScanReport();
+    const report = {
+      ...valid,
+      applicability: {
+        ...valid.applicability,
+        normalizedDiagnosticCount: 2,
+        notApplicable: {
+          groups: [
+            {
+              count: 1,
+              reason: "missing-direct-effect-module-reference",
+              ruleId: "effect-doctor/no-globals",
+            },
+          ],
+          total: 1,
+        },
+      },
+    };
 
     expect(() => Schema.decodeUnknownSync(ScanReportSchema)(report)).toThrow();
   });
@@ -159,6 +225,51 @@ describe("ComparisonReportSchema", () => {
       resolved: [],
       schema: "effect-doctor/comparison/v1",
       unchangedCount: 1,
+    } as const;
+
+    expect(() =>
+      Schema.decodeUnknownSync(ComparisonReportSchema)(report)
+    ).toThrow();
+  });
+
+  it("rejects different comparison entry projects", () => {
+    const baseline = makeScanReport();
+    const report = {
+      baseline,
+      candidate: {
+        ...makeScanReport(),
+        target: {
+          entry: "packages/app/tsconfig.json",
+          projects: ["packages/app/tsconfig.json"],
+        },
+      },
+      doctorVersion: "0.1.0",
+      introduced: [],
+      kind: "comparison",
+      resolved: [],
+      schema: "effect-doctor/comparison/v1",
+      unchangedCount: 0,
+    } as const;
+
+    expect(() =>
+      Schema.decodeUnknownSync(ComparisonReportSchema)(report)
+    ).toThrow();
+  });
+
+  it("rejects different comparison policies", () => {
+    const baseline = makeScanReport();
+    const report = {
+      baseline,
+      candidate: {
+        ...makeScanReport(),
+        policy: { ...SCAN_POLICY, digest: "0".repeat(64) },
+      },
+      doctorVersion: "0.1.0",
+      introduced: [],
+      kind: "comparison",
+      resolved: [],
+      schema: "effect-doctor/comparison/v1",
+      unchangedCount: 0,
     } as const;
 
     expect(() =>

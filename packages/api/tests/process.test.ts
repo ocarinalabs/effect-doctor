@@ -3,7 +3,7 @@ import { Effect } from "effect";
 import type { Duration } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { runProcess } from "../src/internal/process.js";
+import { runProcess } from "../src/internal/analyzers/process.js";
 
 const runNode = (
   source: string,

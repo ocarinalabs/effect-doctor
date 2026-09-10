@@ -1,40 +1,54 @@
-import { compareFindingOrder } from "@effect-doctor/core";
+import {
+  applyRuleApplicability,
+  compareFindingOrder,
+  SCAN_POLICY,
+} from "@effect-doctor/core";
 import type {
+  ApplicabilityReport,
   AnalyzerRun,
   Finding,
   FindingSummary,
   ScanReport,
+  ScanTarget,
+  SourceApplicability,
 } from "@effect-doctor/core";
 import { NodeServices } from "@effect/platform-node";
 import { FileSystem, Path, Effect } from "effect";
+import type { Duration } from "effect";
 
-import { ProjectFailure } from "./errors.js";
+import { InvalidAnalyzerOutput, ProjectFailure } from "./errors.js";
 import type { DoctorFailure } from "./errors.js";
-import { validateAnalyzerRuns } from "./internal/analyzer-run.js";
 import {
   normalizeOxlintFindings,
-  oxlintAnalyzerRuns,
+  oxlintAnalyzerRun,
   runOxlint,
-} from "./internal/oxlint.js";
-import {
-  makeProjectSnapshot,
-  verifyProjectSnapshot,
-} from "./internal/project-snapshot.js";
-import { resolveToolchain } from "./internal/toolchain.js";
-import type { ToolchainVersions } from "./internal/toolchain.js";
+} from "./internal/analyzers/oxlint.js";
 import {
   normalizeTsgoFindings,
   runTsgo,
   validateTsgoFiles,
-} from "./internal/tsgo.js";
+} from "./internal/analyzers/tsgo.js";
+import { projectRelativePath } from "./internal/project/path.js";
+import {
+  makeProjectSnapshot,
+  verifyProjectSnapshot,
+} from "./internal/project/snapshot.js";
+import { resolveToolchain } from "./internal/project/toolchain.js";
+import type { ToolchainVersions } from "./internal/project/toolchain.js";
+import { validateAnalyzerRuns } from "./internal/report/analyzer-run.js";
+import { sealScanReport } from "./internal/report/seal.js";
 import { DOCTOR_VERSION } from "./version.js";
 
 export type ScanRequest = {
+  /**
+   * Longest time one analyzer process may run. Defaults to two minutes.
+   */
+  readonly analyzerTimeout?: Duration.Input | undefined;
+  readonly project?: string | undefined;
   readonly root: string;
 };
 
 const summarize = (findings: readonly Finding[]): FindingSummary => ({
-  advice: findings.filter((finding) => finding.severity === "advice").length,
   errors: findings.filter((finding) => finding.severity === "error").length,
   warnings: findings.filter((finding) => finding.severity === "warning").length,
 });
@@ -47,6 +61,7 @@ const resolveProjectRoot = Effect.fn("resolveProjectRoot")(function* (
     Effect.mapError(
       () =>
         new ProjectFailure({
+          code: "root-unavailable",
           message: "Project root does not exist or cannot be resolved",
           root: requestedRoot,
         })
@@ -54,46 +69,96 @@ const resolveProjectRoot = Effect.fn("resolveProjectRoot")(function* (
   );
 });
 
-const requireTsconfig = Effect.fn("requireTsconfig")(function* (root: string) {
+const outsideRoot = (root: string): ProjectFailure =>
+  new ProjectFailure({
+    code: "outside-root",
+    message:
+      "Project configuration must be a root-relative path inside the project root.",
+    root,
+  });
+
+const projectNotFound = (root: string): ProjectFailure =>
+  new ProjectFailure({
+    code: "project-not-found",
+    message:
+      "The selected project configuration does not exist or cannot be resolved.",
+    root,
+  });
+
+const relativeInsideRoot = (
+  root: string,
+  candidate: string
+): Effect.Effect<string, ProjectFailure> =>
+  Effect.try({
+    catch: () => outsideRoot(root),
+    try: () => projectRelativePath(root, candidate),
+  });
+
+const resolveEntryProject = Effect.fn("resolveEntryProject")(function* (
+  root: string,
+  requestedProject: string
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const tsconfig = path.join(root, "tsconfig.json");
-  const exists = yield* fs.exists(tsconfig).pipe(
-    Effect.mapError(
-      () =>
-        new ProjectFailure({
-          message: "Unable to inspect the project tsconfig.json",
-          root,
-        })
-    )
-  );
-  if (!exists) {
+  if (path.isAbsolute(requestedProject)) {
+    return yield* outsideRoot(root);
+  }
+  const candidate = path.resolve(root, requestedProject);
+  const entry = yield* relativeInsideRoot(root, candidate);
+  const tsconfig = yield* fs
+    .realPath(candidate)
+    .pipe(Effect.mapError(() => projectNotFound(root)));
+  yield* relativeInsideRoot(root, tsconfig);
+  const info = yield* fs
+    .stat(tsconfig)
+    .pipe(Effect.mapError(() => projectNotFound(root)));
+  if (info.type !== "File") {
     return yield* new ProjectFailure({
-      message: "Effect Doctor currently requires a root tsconfig.json",
+      code: "project-invalid",
+      message: "The selected project configuration must be a file.",
       root,
     });
   }
-  return tsconfig;
+  return { entry, tsconfig };
 });
 
-const makeReport = (
-  runs: readonly AnalyzerRun[],
+const applyApplicability = (
   findings: readonly Finding[],
-  versions: ToolchainVersions
-): ScanReport => ({
+  sources: readonly SourceApplicability[]
+) =>
+  Effect.try({
+    catch: (error) =>
+      new InvalidAnalyzerOutput({
+        engine: "effect-doctor",
+        message: `Rule applicability could not be applied: ${error instanceof Error ? error.message : String(error)}`,
+      }),
+    try: () => applyRuleApplicability(findings, sources),
+  });
+
+type ReportInputs = {
+  readonly applicability: ApplicabilityReport;
+  readonly findings: readonly Finding[];
+  readonly runs: readonly AnalyzerRun[];
+  readonly target: ScanTarget;
+  readonly versions: ToolchainVersions;
+};
+
+const makeReport = (inputs: ReportInputs): ScanReport => ({
+  applicability: inputs.applicability,
   doctorVersion: DOCTOR_VERSION,
-  engines: runs,
-  findings,
+  engines: inputs.runs,
+  findings: inputs.findings,
   kind: "scan",
+  policy: SCAN_POLICY,
   root: ".",
   schema: "effect-doctor/scan/v1",
-  summary: summarize(findings),
+  summary: summarize(inputs.findings),
+  target: inputs.target,
   toolchain: {
-    effect: versions.effect,
-    effectOxlint: versions.effectOxlint,
-    oxlint: versions.oxlint,
-    tsgo: versions.tsgo,
-    typescript: versions.typescript,
+    effect: inputs.versions.effect,
+    oxlint: inputs.versions.oxlint,
+    tsgo: inputs.versions.tsgo,
+    typescript: inputs.versions.typescript,
   },
 });
 
@@ -101,15 +166,22 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
   request: ScanRequest
 ) {
   const root = yield* resolveProjectRoot(request.root);
-  const tsconfig = yield* requireTsconfig(root);
+  const selected = yield* resolveEntryProject(
+    root,
+    request.project ?? "tsconfig.json"
+  );
+  const path = yield* Path.Path;
   const toolchain = yield* resolveToolchain();
   const snapshot = yield* makeProjectSnapshot(
     root,
-    tsconfig,
+    selected,
     toolchain.tsgoExecutable
   );
   const [tsgoAnalysis, oxlintAnalysis] = yield* Effect.all(
-    [runTsgo(toolchain, tsconfig), runOxlint(toolchain, root, snapshot.files)],
+    [
+      runTsgo(toolchain, selected.tsconfig, request.analyzerTimeout),
+      runOxlint(toolchain, root, snapshot.files, request.analyzerTimeout),
+    ],
     { concurrency: 2 }
   );
   const tsgoRun = yield* validateTsgoFiles(
@@ -118,27 +190,33 @@ const scanProjectWithServices = Effect.fn("scanProjectWithServices")(function* (
     toolchain.versions.tsgo
   );
   const runs = yield* validateAnalyzerRuns(snapshot, [
-    ...oxlintAnalyzerRuns(
-      root,
-      oxlintAnalysis,
-      snapshot.files,
-      toolchain.versions.effectOxlint
-    ),
+    oxlintAnalyzerRun(root, path, oxlintAnalysis, snapshot.files),
     tsgoRun,
   ]);
   const sources = snapshot.files;
   const oxlintFindings = yield* normalizeOxlintFindings(
     root,
     oxlintAnalysis,
-    sources,
-    tsgoAnalysis.output.files
+    sources
   );
   const tsgoFindings = yield* normalizeTsgoFindings(tsgoAnalysis, sources);
-  const findings = [...tsgoFindings, ...oxlintFindings].sort(
+  const normalizedFindings = [...tsgoFindings, ...oxlintFindings].sort(
     compareFindingOrder
   );
+  const applied = yield* applyApplicability(
+    normalizedFindings,
+    oxlintAnalysis.sourceProfiles
+  );
   yield* verifyProjectSnapshot(snapshot, toolchain.tsgoExecutable);
-  return makeReport(runs, findings, toolchain.versions);
+  return yield* sealScanReport(
+    makeReport({
+      applicability: applied.applicability,
+      findings: applied.findings,
+      runs,
+      target: snapshot.target,
+      versions: toolchain.versions,
+    })
+  );
 });
 
 export const scanProject = (

@@ -1,0 +1,8 @@
+{
+  "name": "effect-doctor-solution-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "effect": "4.0.0-rc.113"
+  }
+}

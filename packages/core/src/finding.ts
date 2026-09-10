@@ -4,7 +4,7 @@ const PositiveInt = Schema.Int.pipe(
   Schema.check(Schema.isGreaterThanOrEqualTo(1))
 );
 
-export const SeveritySchema = Schema.Literals(["error", "warning", "advice"]);
+export const SeveritySchema = Schema.Literals(["error", "warning"]);
 export type Severity = typeof SeveritySchema.Type;
 
 export const CategorySchema = Schema.Literals([
@@ -40,6 +40,7 @@ export const ProjectRelativePathSchema = Schema.NonEmptyString.pipe(
     )
   )
 );
+export type ProjectRelativePath = typeof ProjectRelativePathSchema.Type;
 
 const SourceSpanWire = Schema.Struct({
   end: PositionSchema,
@@ -60,11 +61,7 @@ const SourceSpanSchema = SourceSpanWire.check(
   })
 );
 
-const AnalyzerIdSchema = Schema.Literals([
-  "effect-tsgo",
-  "effect-oxlint",
-  "effect-doctor",
-]);
+const AnalyzerIdSchema = Schema.Literals(["effect-tsgo", "effect-doctor"]);
 
 const ProvenanceSchema = Schema.Struct({
   engine: AnalyzerIdSchema,
@@ -95,7 +92,6 @@ export const AnalyzerRunSchema = Schema.Struct({
 export type AnalyzerRun = typeof AnalyzerRunSchema.Type;
 
 export const FindingSummarySchema = Schema.Struct({
-  advice: Schema.Natural,
   errors: Schema.Natural,
   warnings: Schema.Natural,
 });

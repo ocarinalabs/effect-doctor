@@ -3,9 +3,8 @@ import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
-import { rules as effectOxlintRules } from "oxlint-plugin-effect";
+import effectDoctorPlugin from "oxlint-plugin-effect-doctor";
 
 import { compareCodeUnits } from "../src/internal/order.ts";
 import { PINNED_TOOLCHAIN } from "../src/pinned-toolchain.ts";
@@ -15,25 +14,175 @@ const require = createRequire(import.meta.url);
 const outputPath = resolve(projectRoot, "src/generated/rule-catalog.ts");
 const metadataInputPath = resolve(
   projectRoot,
-  "vendor/effect-tsgo/metadata-0.38.0.json"
+  "vendor/effect-tsgo/metadata-0.45.0.json"
 );
 const PINNED_METADATA_SHA256 =
-  "8efebbb2bd64e8947f3f62bc17cca83f1ffa996175d2c4b3be1a3cda9b88df61";
+  "1b77d4e6800bdb6b77e3a71514aa526a45d127d2e6943dcddfa004fe98d7e518";
 const args = new Set(process.argv.slice(2));
 const valueAfter = (flag) => {
   const index = process.argv.indexOf(flag);
   return index === -1 ? undefined : process.argv[index + 1];
 };
 
-const BLOCKING_OXLINT_RULES = new Set([
-  "noChainedTypeAssertions",
-  "noManagedRuntimeInEffect",
-  "noPerCallCacheConstruction",
-  "noRunCollectOnUnboundedStream",
-  "noUnboundedConcurrency",
-  "noUnboundedRetry",
-  "noWidenThenAssert",
+const ERROR_OXLINT_RULES = new Set([
+  "no-managed-runtime-in-effect",
+  "no-unbounded-concurrency",
 ]);
+
+// Every finding is a mandatory fix, so a rule stays only when the fix is right in
+// every file it applies to. These TSGo rules report ordinary code outside Effect
+// generators, library-author conventions, or general TypeScript style.
+const DROPPED_TSGO_RULES = new Set([
+  "asyncFunction",
+  "deterministicKeys",
+  "globalConsole",
+  "globalDate",
+  "globalFetch",
+  "globalTimers",
+  "missingPipeableSignature",
+  "newSchemaClass",
+  "preferSchemaOverJson",
+  "schemaNumber",
+  "schemaSync",
+  "serviceNotAsClass",
+  "strictBooleanExpressions",
+  "strictEffectProvide",
+  "unnecessaryArrowBlock",
+]);
+
+const ALWAYS_RULE_IDS = new Set([
+  "effect-doctor/consistent-effect-fn-name",
+  "effect-doctor/diagnostic-suppression",
+  "effect-doctor/no-duplicate-layer-factory-call",
+  "effect-doctor/no-inline-schema-compile",
+  "effect-doctor/no-long-lived-layer-acquisition",
+  "effect-doctor/no-manual-sql-transaction",
+  "effect-doctor/no-multiple-callback-resume",
+  "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
+  "effect-doctor/no-network-in-sql-transaction",
+  "effect-doctor/no-run-sync-on-suspending-effect",
+  "effect-doctor/no-throw-in-effect-generator",
+  "effect-doctor/no-unredacted-value-in-diagnostic",
+  "effect-doctor/prefer-abort-signal-passthrough",
+  "effect-doctor/prefer-config-redacted",
+  "effect-doctor/prefer-http-json-response",
+  "effect-doctor/prefer-structured-log-data",
+  "effect/abort-controller-in-effect",
+  "effect/acquire-release-disposable",
+  "effect/all-of-map-to-for-each",
+  "effect/any-unknown-in-error-context",
+  "effect/catch-all-tag-dispatch-to-catch-tag",
+  "effect/catch-all-to-map-error",
+  "effect/catch-chain-to-first-success-of",
+  "effect/catch-conditional-refail-to-catch-if",
+  "effect/catch-die-to-or-die",
+  "effect/catch-tag-to-catch-reason",
+  "effect/catch-to-ignore",
+  "effect/catch-to-or-else-succeed",
+  "effect/catch-unfailable-effect",
+  "effect/class-self-mismatch",
+  "effect/crypto-random-uuid-in-effect",
+  "effect/duplicate-package",
+  "effect/effect-do-notation",
+  "effect/effect-fn-iife",
+  "effect/effect-fn-implicit-any",
+  "effect/effect-fn-opportunity",
+  "effect/effect-gen-uses-adapter",
+  "effect/effect-in-failure",
+  "effect/effect-in-void-success",
+  "effect/effect-map-flatten",
+  "effect/effect-map-void",
+  "effect/effect-succeed-with-void",
+  "effect/flat-map-conditional-to-filter-or-fail",
+  "effect/flat-map-to-map",
+  "effect/floating-effect",
+  "effect/floating-effect-in-vitest",
+  "effect/global-console-in-effect",
+  "effect/global-date-in-effect",
+  "effect/global-error-in-effect-catch",
+  "effect/global-error-in-effect-failure",
+  "effect/global-fetch-in-effect",
+  "effect/global-random-in-effect",
+  "effect/global-timers-in-effect",
+  "effect/instance-of-schema",
+  "effect/layer-merge-all-with-dependencies",
+  "effect/lazy-effect",
+  "effect/lazy-promise-in-effect-sync",
+  "effect/leaking-requirements",
+  "effect/map-some-to-as-some",
+  "effect/match-effect-to-map-both",
+  "effect/match-effect-to-match",
+  "effect/missing-effect-context",
+  "effect/missing-effect-error",
+  "effect/missing-layer-context",
+  "effect/missing-return-yield-star",
+  "effect/missing-star-in-yield-effect-gen",
+  "effect/multiple-catch-tag",
+  "effect/multiple-effect-provide",
+  "effect/nested-effect-gen-yield",
+  "effect-doctor/no-managed-runtime-in-effect",
+  "effect-doctor/no-sequential-effect-all",
+  "effect-doctor/no-unbounded-concurrency",
+  "effect/obsolete-match-import",
+  "effect/obsolete-schema-import",
+  "effect/option-match-to-from-option",
+  "effect/outdated-api",
+  "effect/overridden-schema-constructor",
+  "effect-doctor/prefer-catch-tag",
+  "effect-doctor/prefer-effect-fn",
+  "effect/prefer-schema-type-property",
+  "effect/prefer-succeed-some-or-none",
+  "effect/prefer-typed-schema-decoder",
+  "effect/prefer-unsafe-constructor",
+  "effect/process-env-in-effect",
+  "effect/promise-in-effect-success",
+  "effect/provide-layer-succeed-to-provide-service",
+  "effect/race-first-with-sleep-to-timeout",
+  "effect/redundant-map-error",
+  "effect/redundant-or-die",
+  "effect/redundant-schema-tag-identifier",
+  "effect-doctor/require-named-effect-fn",
+  "effect/return-effect-in-gen",
+  "effect/run-effect-inside-effect",
+  "effect/run-of-exit-to-run-exit",
+  "effect/schema-literal-non-finite",
+  "effect/schema-opaque-instance-member",
+  "effect/schema-struct-with-tag",
+  "effect/schema-sync-in-effect",
+  "effect/sync-to-succeed",
+  "effect/timeout-catch-tag-to-timeout-or-else",
+  "effect/try-catch-in-effect-gen",
+  "effect/unknown-in-effect-catch",
+  "effect/unnecessary-effect-gen",
+  "effect/unnecessary-fail-yieldable-error",
+  "effect/unnecessary-pipe",
+  "effect/unnecessary-pipe-chain",
+  "effect/unsafe-effect-type-assertion",
+]);
+
+const DIRECT_EFFECT_MODULE_RULE_IDS = new Set([
+  "effect/crypto-random-uuid",
+  "effect/global-random",
+  "effect/node-builtin-import",
+  "effect/process-env",
+  "effect/extends-native-error",
+  "effect/missed-pipeable-opportunity",
+  "effect/new-promise",
+  "effect-doctor/no-module-mocks",
+  "effect-doctor/prefer-match-tags-exhaustive",
+  "effect-doctor/prefer-predicate-is-tagged",
+  "effect/unnecessary-typeof-type",
+]);
+
+const ruleApplicability = (id) => {
+  if (ALWAYS_RULE_IDS.has(id)) {
+    return "always";
+  }
+  if (DIRECT_EFFECT_MODULE_RULE_IDS.has(id)) {
+    return "direct-effect-module";
+  }
+  throw new Error(`Rule ${id} has no explicit applicability family`);
+};
 
 const normalizeCategory = (group) =>
   group === "effectNative" ? "effect-native" : group;
@@ -41,6 +190,7 @@ const normalizeCategory = (group) =>
 const toKebabCase = (value) =>
   value
     .replaceAll(/(?<lower>[a-z\d])(?<upper>[A-Z])/gu, "$<lower>-$<upper>")
+    .replaceAll(/(?<acronym>[A-Z]+)(?<word>[A-Z][a-z])/gu, "$<acronym>-$<word>")
     .replaceAll(/[\s_]+/gu, "-")
     .toLowerCase();
 
@@ -50,51 +200,17 @@ const title = (value) =>
     .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
     .join(" ");
 
-const severity = (providerSeverity) => {
-  if (providerSeverity === "error" || providerSeverity === "warning") {
-    return providerSeverity;
-  }
-  return "advice";
-};
+const severity = (providerSeverity) =>
+  providerSeverity === "error" ? "error" : "warning";
 
-const tsgoStatus = (providerSeverity) => {
-  if (providerSeverity === "error") {
-    return "blocking";
-  }
-  return "advisory";
-};
-
-const oxlintPolicy = (name) => {
-  if (BLOCKING_OXLINT_RULES.has(name)) {
-    return { defaultSeverity: "error", status: "blocking" };
-  }
-  return { defaultSeverity: "advice", status: "advisory" };
-};
+const oxlintSeverity = (name) =>
+  ERROR_OXLINT_RULES.has(name) ? "error" : "warning";
 
 const oxlintCategory = (name) => {
   if (
-    [
-      "noManagedRuntimeInEffect",
-      "noPerCallCacheConstruction",
-      "noRunCollectOnUnboundedStream",
-      "noUnboundedConcurrency",
-      "noUnboundedRetry",
-    ].includes(name)
+    ["no-managed-runtime-in-effect", "no-unbounded-concurrency"].includes(name)
   ) {
     return "resource-safety";
-  }
-  if (
-    [
-      "noChainedTypeAssertions",
-      "noKnownValueWidening",
-      "noObjectParameters",
-      "noUnknownParameters",
-      "noUnknownTypeAliases",
-      "noUnsafeDictionaryType",
-      "noWidenThenAssert",
-    ].includes(name)
-  ) {
-    return "correctness";
   }
   return "antipattern";
 };
@@ -105,7 +221,7 @@ const verifyMetadataSource = (source) => {
   const digest = createHash("sha256").update(source).digest("hex");
   if (digest !== PINNED_METADATA_SHA256) {
     throw new Error(
-      `Expected exact @effect/tsgo 0.38.0 metadata ${PINNED_METADATA_SHA256}, got ${digest}`
+      `Expected exact @effect/tsgo 0.45.0 metadata ${PINNED_METADATA_SHA256}, got ${digest}`
     );
   }
 };
@@ -127,7 +243,7 @@ const referenceMetadata = (reference) =>
       "-C",
       resolve(reference),
       "show",
-      "@effect/tsgo@0.38.0:_packages/tsgo/src/metadata.json",
+      "@effect/tsgo@0.45.0:_packages/tsgo/src/metadata.json",
     ],
     { encoding: "utf-8" }
   );
@@ -155,59 +271,69 @@ const readMetadata = () => {
   return JSON.parse(source);
 };
 
+const supportsEffectV4 = (rule) => rule.supportedEffect.includes("v4");
+
+const isActiveTsgoRule = (rule) =>
+  supportsEffectV4(rule) && !DROPPED_TSGO_RULES.has(rule.name);
+
 const makeTsgoEntries = (metadata) =>
-  metadata.rules
-    .filter((rule) => rule.supportedEffect.includes("v4"))
-    .map((rule) => ({
-      category: normalizeCategory(rule.group),
-      defaultSeverity: severity(rule.defaultSeverity),
-      description: rule.description,
-      diagnosticCodes: rule.codes,
-      diagnosticRuleIds: [rule.name],
-      execution: "tsgo",
-      fixable: rule.fixable,
-      id: `effect/${toKebabCase(rule.name)}`,
-      nativeRuleId: rule.name,
-      providerDefaultSeverity: rule.defaultSeverity,
-      providerRuleId: rule.name,
-      source: "effect-tsgo",
-      status: tsgoStatus(rule.defaultSeverity),
-      title: title(rule.name),
-    }));
+  metadata.rules.filter(isActiveTsgoRule).map((rule) => ({
+    category: normalizeCategory(rule.group),
+    defaultSeverity: severity(rule.defaultSeverity),
+    description: rule.description,
+    diagnosticCodes: rule.codes,
+    diagnosticRuleIds: [rule.name],
+    execution: "tsgo",
+    fixable: rule.fixable,
+    id: `effect/${toKebabCase(rule.name)}`,
+    nativeRuleId: rule.name,
+    providerDefaultSeverity: rule.defaultSeverity,
+    providerRuleId: rule.name,
+    source: "effect-tsgo",
+    title: title(rule.name),
+  }));
 
 const oxlintDescription = (name, docs) =>
   typeof docs?.description === "string"
     ? docs.description
-    : `Effect Oxlint rule ${name}`;
+    : `Effect Doctor rule ${name}`;
 
 const isOxlintFixable = (fixable) => ["code", "whitespace"].includes(fixable);
 
-const makeOxlintEntry = ([name, rule]) => {
+const makeAdoptedEntry = ([name, rule]) => {
   const docs = rule.meta?.docs;
   return {
     category: oxlintCategory(name),
     description: oxlintDescription(name, docs),
     diagnosticCodes: [],
-    diagnosticRuleIds: [`effect(${name})`],
+    defaultSeverity: oxlintSeverity(name),
+    diagnosticRuleIds: [`effect-doctor(${name})`],
     execution: "oxlint",
     fixable: isOxlintFixable(rule.meta?.fixable),
-    id: `effect/${toKebabCase(name)}`,
-    nativeRuleId: `effect/${name}`,
-    providerDefaultSeverity: "off",
-    providerRuleId: `effect/${name}`,
-    source: "effect-oxlint",
+    id: `effect-doctor/${name}`,
+    nativeRuleId: name,
+    providerDefaultSeverity: "error",
+    providerRuleId: `effect-doctor/${name}`,
+    source: "effect-doctor",
     title: title(name),
-    ...oxlintPolicy(name),
   };
 };
 
-const makeOxlintEntries = () =>
-  Object.entries(effectOxlintRules).map(makeOxlintEntry);
+const installedPluginRules = () => Object.entries(effectDoctorPlugin.rules);
 
-const makeDoctorEntries = () => [
+const makeAdoptedEntries = () => {
+  const authoredNames = new Set(
+    DOCTOR_ENTRIES.map((entry) => entry.nativeRuleId)
+  );
+  return installedPluginRules()
+    .filter(([name]) => !authoredNames.has(name))
+    .map(makeAdoptedEntry);
+};
+
+const DOCTOR_ENTRIES = [
   {
     category: "effect-native",
-    defaultSeverity: "advice",
+    defaultSeverity: "warning",
     description:
       "Keep unqualified Effect.fn span names consistent with their assigned function names.",
     diagnosticCodes: [],
@@ -219,12 +345,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/consistent-effect-fn-name",
     source: "effect-doctor",
-    status: "advisory",
     title: "Consistent Effect Fn Name",
   },
   {
     category: "antipattern",
-    defaultSeverity: "advice",
+    defaultSeverity: "warning",
     description:
       "Keeps analyzer suppression directives visible for explicit review.",
     diagnosticCodes: [377_000],
@@ -239,12 +364,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/__diagnostic-suppression-integrity",
     source: "effect-doctor",
-    status: "advisory",
     title: "Diagnostic Suppression",
   },
   {
     category: "resource-safety",
-    defaultSeverity: "advice",
+    defaultSeverity: "warning",
     description:
       "Reuse a zero-argument Layer factory result within one composition graph unless the duplicate is explicitly fresh.",
     diagnosticCodes: [],
@@ -256,12 +380,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-duplicate-layer-factory-call",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Duplicate Layer Factory Call",
   },
   {
-    category: "resource-safety",
-    defaultSeverity: "advice",
+    category: "antipattern",
+    defaultSeverity: "warning",
     description:
       "Reuse closed Effect v4 schemas and parser adapters outside repeated function execution.",
     diagnosticCodes: [],
@@ -273,12 +396,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-inline-schema-compile",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Inline Schema Compile",
   },
   {
     category: "resource-safety",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Fork provably long-lived work into the Layer scope instead of blocking acquisition.",
     diagnosticCodes: [],
@@ -290,12 +412,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-long-lived-layer-acquisition",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Long Lived Layer Acquisition",
   },
   {
     category: "correctness",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Call an Effect.callback continuation at most once on a straight-line path.",
     diagnosticCodes: [],
@@ -307,12 +428,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-multiple-callback-resume",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Multiple Callback Resume",
   },
   {
     category: "correctness",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Prevent direct mutation of arrays shared with Chunk.fromArrayUnsafe.",
     diagnosticCodes: [],
@@ -324,12 +444,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-mutation-after-unsafe-chunk-wrap",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Mutation After Unsafe Chunk Wrap",
   },
   {
     category: "resource-safety",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Use Effect SQL transaction ownership instead of sending transaction-control statements manually.",
     diagnosticCodes: [],
@@ -341,12 +460,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-manual-sql-transaction",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Manual SQL Transaction",
   },
   {
     category: "security",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Prevent Redacted.value from exposing secrets directly inside diagnostic and telemetry sinks.",
     diagnosticCodes: [],
@@ -358,12 +476,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-unredacted-value-in-diagnostic",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Unredacted Value In Diagnostic",
   },
   {
     category: "resource-safety",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Keep direct HTTP work outside Effect SQL transaction effects.",
     diagnosticCodes: [],
@@ -375,12 +492,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-network-in-sql-transaction",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Network In SQL Transaction",
   },
   {
     category: "correctness",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Avoid synchronous runners for Effect constructors that are proven to suspend.",
     diagnosticCodes: [],
@@ -392,12 +508,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-run-sync-on-suspending-effect",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Run Sync On Suspending Effect",
   },
   {
     category: "correctness",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Keep escaping exceptions out of confirmed Effect generator bodies.",
     diagnosticCodes: [],
@@ -409,12 +524,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/no-throw-in-effect-generator",
     source: "effect-doctor",
-    status: "advisory",
     title: "No Throw In Effect Generator",
   },
   {
     category: "resource-safety",
-    defaultSeverity: "advice",
+    defaultSeverity: "warning",
     description:
       "Forward Effect's AbortSignal when adapting a directly cancellable fetch promise.",
     diagnosticCodes: [],
@@ -426,12 +540,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/prefer-abort-signal-passthrough",
     source: "effect-doctor",
-    status: "advisory",
     title: "Prefer Abort Signal Passthrough",
   },
   {
     category: "security",
-    defaultSeverity: "advice",
+    defaultSeverity: "error",
     description:
       "Redact statically named secret configuration values at construction.",
     diagnosticCodes: [],
@@ -443,12 +556,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/prefer-config-redacted",
     source: "effect-doctor",
-    status: "advisory",
     title: "Prefer Config Redacted",
   },
   {
     category: "effect-native",
-    defaultSeverity: "advice",
+    defaultSeverity: "warning",
     description:
       "Pass structured values directly to Effect logging instead of serializing them first.",
     diagnosticCodes: [],
@@ -460,12 +572,11 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/prefer-structured-log-data",
     source: "effect-doctor",
-    status: "advisory",
     title: "Prefer Structured Log Data",
   },
   {
-    category: "correctness",
-    defaultSeverity: "advice",
+    category: "effect-native",
+    defaultSeverity: "warning",
     description:
       "Use Effect's JSON response constructor instead of stringifying into a text response.",
     diagnosticCodes: [],
@@ -477,7 +588,6 @@ const makeDoctorEntries = () => [
     providerDefaultSeverity: "warning",
     providerRuleId: "effect-doctor/prefer-http-json-response",
     source: "effect-doctor",
-    status: "advisory",
     title: "Prefer HTTP JSON Response",
   },
 ];
@@ -489,6 +599,18 @@ const sortEntries = (entries) =>
       compareCodeUnits(left.source, right.source)
   );
 
+const makeEntries = (metadata) =>
+  sortEntries(
+    [
+      ...makeTsgoEntries(metadata),
+      ...makeAdoptedEntries(),
+      ...DOCTOR_ENTRIES,
+    ].map((entry) => ({
+      ...entry,
+      applicability: ruleApplicability(entry.id),
+    }))
+  );
+
 const assertCount = (label, actual, expected) => {
   if (actual !== expected) {
     throw new Error(`${label}: expected ${expected}, got ${actual}`);
@@ -497,9 +619,8 @@ const assertCount = (label, actual, expected) => {
 
 const assertProviderCounts = (entries) => {
   const expectedCounts = {
-    "effect-doctor": 16,
-    "effect-oxlint": 40,
-    "effect-tsgo": 94,
+    "effect-doctor": 25,
+    "effect-tsgo": 93,
   };
   for (const [source, count] of Object.entries(expectedCounts)) {
     const actual = entries.filter((entry) => entry.source === source).length;
@@ -516,8 +637,8 @@ const assertUniqueCanonicalIds = (entries) => {
 
 const assertTsgoCodes = (tsgo) => {
   const tsgoCodes = tsgo.flatMap((entry) => entry.diagnosticCodes);
-  if (tsgoCodes.length !== 103 || new Set(tsgoCodes).size !== 103) {
-    throw new Error("Expected 103 unique TSGo diagnostic codes");
+  if (tsgoCodes.length !== 101 || new Set(tsgoCodes).size !== 101) {
+    throw new Error("Expected 101 unique TSGo diagnostic codes");
   }
 };
 
@@ -535,6 +656,30 @@ const assertUniqueDiagnosticRuleIds = (entries) => {
   }
 };
 
+const assertApplicabilityPolicy = (entries) => {
+  const catalogIds = entries.map((entry) => entry.id).sort(compareCodeUnits);
+  const policyIds = [...ALWAYS_RULE_IDS, ...DIRECT_EFFECT_MODULE_RULE_IDS].sort(
+    compareCodeUnits
+  );
+  if (JSON.stringify(catalogIds) !== JSON.stringify(policyIds)) {
+    throw new Error(
+      "Every canonical rule must have exactly one explicit applicability family"
+    );
+  }
+  assertCount("active rules", entries.length, 118);
+  assertDistribution(
+    entries,
+    "applicability",
+    { always: 107, "direct-effect-module": 11 },
+    "applicability"
+  );
+  const errors = entries.filter((entry) => entry.defaultSeverity === "error");
+  assertCount("error rules", errors.length, 23);
+  if (errors.some((entry) => entry.applicability !== "always")) {
+    throw new Error("Every error rule must always apply");
+  }
+};
+
 const assertCatalog = (entries) => {
   assertProviderCounts(entries);
   assertUniqueCanonicalIds(entries);
@@ -544,36 +689,44 @@ const assertCatalog = (entries) => {
     tsgo,
     "category",
     {
-      antipattern: 19,
-      correctness: 16,
-      "effect-native": 22,
-      style: 37,
+      antipattern: 18,
+      correctness: 19,
+      "effect-native": 15,
+      style: 41,
     },
     "TSGo category"
   );
   assertDistribution(
     tsgo,
     "providerDefaultSeverity",
-    { error: 12, off: 33, suggestion: 36, warning: 13 },
+    { error: 12, off: 20, suggestion: 46, warning: 15 },
     "TSGo severity"
   );
   assertCount(
     "fixable TSGo rules",
     tsgo.filter((entry) => entry.fixable).length,
-    41
+    46
   );
   assertUniqueDiagnosticRuleIds(entries);
+  assertApplicabilityPolicy(entries);
 };
 
-const render = (entries) =>
+const disabledTsgoRules = (metadata) =>
+  metadata.rules
+    .filter((rule) => !isActiveTsgoRule(rule))
+    .map((rule) => rule.name)
+    .sort(compareCodeUnits);
+
+const render = (entries, metadata) =>
   `// Generated by scripts/rule-catalog.mjs. Do not edit by hand.\n` +
+  `export const GENERATED_DISABLED_TSGO_RULES = ${JSON.stringify(disabledTsgoRules(metadata), null, 2)} as const;\n` +
   `export const GENERATED_RULE_CATALOG = ${JSON.stringify(entries, null, 2)} as const;\n`;
 
 const parseGenerated = () => {
   const source = readFileSync(outputPath, "utf-8");
   const prefix = "export const GENERATED_RULE_CATALOG = ";
   const start = source.indexOf(prefix);
-  const end = source.lastIndexOf(" as const;");
+  const end = source.indexOf(" as const;", start);
   if (start === -1 || end === -1) {
     throw new Error("Invalid generated catalog format");
   }
@@ -594,62 +747,74 @@ const assertSameInventory = (label, actual, expected) => {
   }
 };
 
-const verifyTsgoSchema = (schemaRules, catalogTsgo) => {
-  const schemaNames = Object.keys(schemaRules)
-    .filter(
-      (name) =>
-        ![
-          "genericEffectServices",
-          "missingEffectServiceDependency",
-          "nonObjectEffectServiceType",
-          "schemaUnionOfLiterals",
-          "scopeInLayerEffect",
-        ].includes(name)
-    )
+// The published @effect/tsgo schema.json matched the tagged metadata at 0.45.0.
+// List a rule here when a release publishes a schema that omits it or keeps an
+// older description, so the drift check names the release instead of failing.
+const PUBLISHED_SCHEMA_OMISSIONS = new Set();
+
+const PUBLISHED_SCHEMA_STALE_DESCRIPTIONS = new Set();
+
+const verifyTsgoSchemaEntry = (schemaRules, entry) => {
+  const schemaRule = schemaRules[entry.providerRuleId];
+  if (PUBLISHED_SCHEMA_OMISSIONS.has(entry.providerRuleId)) {
+    if (schemaRule !== undefined) {
+      throw new Error(
+        `${entry.providerRuleId} is in the published TSGo schema; remove it from PUBLISHED_SCHEMA_OMISSIONS`
+      );
+    }
+    return;
+  }
+  if (schemaRule.default !== entry.providerDefaultSeverity) {
+    throw new Error(`TSGo severity drift for ${entry.providerRuleId}`);
+  }
+  const staleDescription = PUBLISHED_SCHEMA_STALE_DESCRIPTIONS.has(
+    entry.providerRuleId
+  );
+  if ((schemaRule.description !== entry.description) !== staleDescription) {
+    throw new Error(`TSGo metadata drift for ${entry.providerRuleId}`);
+  }
+};
+
+const verifyTsgoSchema = (schemaRules, catalogTsgo, metadata) => {
+  const schemaNames = Object.keys(schemaRules).sort(compareCodeUnits);
+  const metadataNames = metadata.rules
+    .map((rule) => rule.name)
+    .filter((name) => !PUBLISHED_SCHEMA_OMISSIONS.has(name))
+    .sort(compareCodeUnits);
+  assertSameInventory("TSGo schema", schemaNames, metadataNames);
+  const v4Names = metadata.rules
+    .filter(isActiveTsgoRule)
+    .map((rule) => rule.name)
     .sort(compareCodeUnits);
   const catalogNames = catalogTsgo
     .map((entry) => entry.providerRuleId)
     .sort(compareCodeUnits);
-  assertSameInventory("TSGo schema", schemaNames, catalogNames);
+  assertSameInventory("TSGo Effect v4", v4Names, catalogNames);
   for (const entry of catalogTsgo) {
-    const schemaRule = schemaRules[entry.providerRuleId];
-    if (
-      schemaRule.default !== entry.providerDefaultSeverity ||
-      schemaRule.description !== entry.description
-    ) {
-      throw new Error(`TSGo metadata drift for ${entry.providerRuleId}`);
-    }
+    verifyTsgoSchemaEntry(schemaRules, entry);
   }
 };
 
-const verifyOxlintInventory = (entries) => {
-  const installedOxlintNames =
-    Object.keys(effectOxlintRules).sort(compareCodeUnits);
-  const catalogOxlint = entries.filter(
-    (entry) => entry.source === "effect-oxlint"
-  );
-  const catalogOxlintNames = catalogOxlint
-    .map((entry) => entry.providerRuleId.slice("effect/".length))
+const verifyPluginInventory = (entries) => {
+  const installedNames = installedPluginRules()
+    .map(([name]) => name)
     .sort(compareCodeUnits);
-  assertSameInventory(
-    "Effect Oxlint",
-    installedOxlintNames,
-    catalogOxlintNames
-  );
+  const catalogNames = entries
+    .filter(
+      (entry) =>
+        entry.source === "effect-doctor" && entry.execution === "oxlint"
+    )
+    .map((entry) => entry.nativeRuleId)
+    .sort(compareCodeUnits);
+  assertSameInventory("Effect Doctor plugin", installedNames, catalogNames);
 };
 
-const verifyInstalledProviders = (entries) => {
+const verifyInstalledProviders = (entries, metadata) => {
   const tsgoPackage = require.resolve("@effect/tsgo/package.json");
   const tsgoRoot = dirname(tsgoPackage);
   const requireFromTsgo = createRequire(tsgoPackage);
-  const effectPlugin = fileURLToPath(
-    import.meta.resolve("oxlint-plugin-effect/plugin")
-  );
   const installed = {
     effect: readJson(require.resolve("effect/package.json")),
-    effectOxlint: readJson(
-      resolve(dirname(dirname(effectPlugin)), "package.json")
-    ),
     oxlint: readJson(require.resolve("oxlint/package.json")),
     oxlintPlugins: readJson(
       resolve(dirname(require.resolve("@oxlint/plugins")), "package.json")
@@ -668,32 +833,24 @@ const verifyInstalledProviders = (entries) => {
     schema.definitions.effectLanguageServicePluginDiagnosticSeverityDefinition
       .properties;
   const catalogTsgo = entries.filter((entry) => entry.source === "effect-tsgo");
-  verifyTsgoSchema(schemaRules, catalogTsgo);
-  verifyOxlintInventory(entries);
+  verifyTsgoSchema(schemaRules, catalogTsgo, metadata);
+  verifyPluginInventory(entries);
 };
 
 const metadata = readMetadata();
 if (args.has("--write")) {
-  const entries = sortEntries([
-    ...makeTsgoEntries(metadata),
-    ...makeOxlintEntries(),
-    ...makeDoctorEntries(),
-  ]);
+  const entries = makeEntries(metadata);
   assertCatalog(entries);
-  verifyInstalledProviders(entries);
+  verifyInstalledProviders(entries, metadata);
   mkdirSync(dirname(outputPath), { recursive: true });
-  writeFileSync(outputPath, render(entries));
+  writeFileSync(outputPath, render(entries, metadata));
   process.stdout.write(`wrote ${outputPath}\n`);
 } else {
   const entries = parseGenerated();
   assertCatalog(entries);
-  verifyInstalledProviders(entries);
-  const expected = sortEntries([
-    ...makeTsgoEntries(metadata),
-    ...makeOxlintEntries(),
-    ...makeDoctorEntries(),
-  ]);
-  if (render(entries) !== render(expected)) {
+  verifyInstalledProviders(entries, metadata);
+  const expected = makeEntries(metadata);
+  if (render(entries, metadata) !== render(expected, metadata)) {
     throw new Error("Generated catalog differs from pinned reference metadata");
   }
   process.stderr.write("rule catalog is current\n");

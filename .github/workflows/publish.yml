@@ -44,7 +44,7 @@ jobs:
           const expected = `v${manifest.version}`;
           if (
             process.env.RELEASE_TAG !== expected ||
-            manifest.name !== "@ocarinalabs/effect-doctor" ||
+            manifest.name !== "dr-effect" ||
             manifest.private === true ||
             pluginManifest.name !== "oxlint-plugin-effect-doctor" ||
             pluginManifest.private === true ||
@@ -97,7 +97,7 @@ jobs:
           node --input-type=module <<'NODE'
           import effectDoctor from "eslint-plugin-effect-doctor";
           if (
-            Object.keys(effectDoctor.rules).length !== 15 ||
+            Object.keys(effectDoctor.rules).length !== 24 ||
             effectDoctor.configs.recommended.plugins["effect-doctor"] !== effectDoctor
           ) {
             throw new Error("The packed ESLint plugin contract is incomplete");

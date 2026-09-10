@@ -1,10 +1,14 @@
 import type { Category, Severity } from "./finding.js";
-import { GENERATED_RULE_CATALOG } from "./generated/rule-catalog.js";
+import {
+  GENERATED_DISABLED_TSGO_RULES,
+  GENERATED_RULE_CATALOG,
+} from "./generated/rule-catalog.js";
 
-export type RuleSource = "effect-tsgo" | "effect-oxlint" | "effect-doctor";
-export type RuleStatus = "blocking" | "advisory";
+export type RuleSource = "effect-tsgo" | "effect-doctor";
+export type RuleApplicability = "always" | "direct-effect-module";
 
 export type RuleMetadata = {
+  readonly applicability: RuleApplicability;
   readonly id: string;
   readonly nativeRuleId: string;
   readonly title: string;
@@ -13,7 +17,6 @@ export type RuleMetadata = {
   readonly description: string;
   readonly defaultSeverity: Severity;
   readonly fixable: boolean;
-  readonly status: RuleStatus;
 };
 
 export type RuleCatalogEntry = RuleMetadata & {
@@ -44,11 +47,11 @@ export const ruleForTsgoDiagnostic = (
 const oxlintSeverity = (severity: Severity): "error" | "warn" =>
   severity === "error" ? "error" : "warn";
 
-export const effectOxlintRules: Readonly<Record<string, "error" | "warn">> =
+export const doctorOxlintRules: Readonly<Record<string, "error" | "warn">> =
   Object.fromEntries(
-    RULE_CATALOG.filter((rule) => rule.source === "effect-oxlint").map(
-      (rule) => [rule.providerRuleId, oxlintSeverity(rule.defaultSeverity)]
-    )
+    RULE_CATALOG.filter(
+      (rule) => rule.source === "effect-doctor" && rule.execution === "oxlint"
+    ).map((rule) => [rule.providerRuleId, oxlintSeverity(rule.defaultSeverity)])
   );
 
 export const integrityOxlintRules: Readonly<Record<string, "error" | "warn">> =
@@ -60,16 +63,21 @@ export const integrityOxlintRules: Readonly<Record<string, "error" | "warn">> =
   );
 
 export const tsgoDiagnosticSeverity: Readonly<
-  Record<string, "error" | "warning">
-> = Object.fromEntries(
-  RULE_CATALOG.filter((rule) => rule.source === "effect-tsgo").map((rule) => [
-    rule.providerRuleId,
-    rule.defaultSeverity === "error" ? "error" : "warning",
-  ])
-);
+  Record<string, "error" | "warning" | "off">
+> = Object.fromEntries([
+  ...GENERATED_DISABLED_TSGO_RULES.map((name) => [name, "off"] as const),
+  ...RULE_CATALOG.filter((rule) => rule.source === "effect-tsgo").map(
+    (rule) =>
+      [
+        rule.providerRuleId,
+        rule.defaultSeverity === "error" ? "error" : "warning",
+      ] as const
+  ),
+]);
 
 export const knownRules = (): readonly RuleMetadata[] =>
   RULE_CATALOG.map((rule): RuleMetadata => ({
+    applicability: rule.applicability,
     category: rule.category,
     defaultSeverity: rule.defaultSeverity,
     description: rule.description,
@@ -77,6 +85,5 @@ export const knownRules = (): readonly RuleMetadata[] =>
     id: rule.id,
     nativeRuleId: rule.nativeRuleId,
     source: rule.source,
-    status: rule.status,
     title: rule.title,
   }));

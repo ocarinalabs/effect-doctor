@@ -1,24 +1,17 @@
 import { defineRule } from "@oxlint/plugins";
-import type { Context, ESTree } from "@oxlint/plugins";
+import type { ESTree } from "@oxlint/plugins";
 
 import {
-  bindingForReference,
   collectImportBindings,
-  identifierHasBinding,
-  namedMember,
   staticPropertyName,
   staticString,
   unwrapExpression,
-} from "./ast.ts";
-
-type ImportBinding = "effect-fn" | "effect-module" | "effect-package";
-
-const IMPORT_BINDINGS: ReadonlyMap<string, ImportBinding> = new Map([
-  ["effect:namespace", "effect-package"],
-  ["effect:named:Effect", "effect-module"],
-  ["effect/Effect:namespace", "effect-module"],
-  ["effect/Effect:named:fn", "effect-fn"],
-]);
+} from "../internal/ast.ts";
+import {
+  EFFECT_IMPORT_BINDINGS,
+  effectExportName,
+} from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
 
 type TransparentExpression = Extract<
   ESTree.Expression,
@@ -126,36 +119,6 @@ const directlyAssignedName = (
   );
 };
 
-const isEffectFn = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  expression: ESTree.Expression
-): boolean => {
-  const callee = unwrapExpression(expression);
-  if (callee.type === "Identifier") {
-    return bindingForReference(context, bindings, callee) === "effect-fn";
-  }
-  const fnMember = namedMember(callee, "fn");
-  if (fnMember === undefined) {
-    return false;
-  }
-  if (
-    identifierHasBinding(context, bindings, fnMember.object, "effect-module")
-  ) {
-    return true;
-  }
-  const effectMember = namedMember(fnMember.object, "Effect");
-  return (
-    effectMember !== undefined &&
-    identifierHasBinding(
-      context,
-      bindings,
-      effectMember.object,
-      "effect-package"
-    )
-  );
-};
-
 const inlineFunctionArgument = (
   argument: ESTree.Argument | undefined
 ): boolean => {
@@ -186,12 +149,12 @@ export const consistentEffectFnName = defineRule({
     type: "suggestion",
   },
   createOnce(context) {
-    let bindings: ReadonlyMap<number, ImportBinding> = new Map();
+    let bindings: ReadonlyMap<number, EffectImportBinding> = new Map();
     return {
       before() {
         bindings = collectImportBindings(
           context.sourceCode.ast,
-          IMPORT_BINDINGS
+          EFFECT_IMPORT_BINDINGS
         );
       },
       CallExpression(node) {
@@ -201,8 +164,7 @@ export const consistentEffectFnName = defineRule({
         const factory = unwrapExpression(node.callee);
         if (
           factory.type !== "CallExpression" ||
-          factory.callee.type === "Super" ||
-          !isEffectFn(context, bindings, factory.callee)
+          effectExportName(context, bindings, factory.callee) !== "fn"
         ) {
           return;
         }

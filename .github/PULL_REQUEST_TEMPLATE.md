@@ -16,7 +16,6 @@ Run the checks that apply:
 
 ```sh
 bun run check
-bun run audit
 bun run doctor:self
 bun run verify:package # When a package boundary changed
 git diff --check

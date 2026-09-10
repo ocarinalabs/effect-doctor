@@ -8,23 +8,23 @@ inputs:
   directory:
     description: Project directory to analyze
     default: .
+  project:
+    description: TypeScript project file relative to directory
+    default: tsconfig.json
   scope:
     description: "Pull request scope: changed, files, lines, or full. Other events always use full."
     default: changed
-  blocking:
-    description: "Lowest severity that fails the workflow: none, warning, or error."
-    default: none
   comment:
     description: Create or update a pull request summary comment
     default: "true"
   review-comments:
-    description: Add inline comments for Findings on changed lines
+    description: Add review comments for Findings on changed lines
     default: "true"
   commit-status:
     description: Publish an Effect Doctor commit status
     default: "true"
   node-version:
-    description: Node.js version used by Effect Doctor
+    description: Node.js version for the Action
     default: "24"
   version:
     description: Effect Doctor npm version or package specification
@@ -46,9 +46,6 @@ outputs:
   warning-count:
     description: Warning Findings selected by the requested scope
     value: ${{ steps.scan.outputs.warning-count }}
-  advice-count:
-    description: Advice Findings selected by the requested scope
-    value: ${{ steps.scan.outputs.advice-count }}
   affected-files:
     description: Files containing selected Findings
     value: ${{ steps.scan.outputs.affected-files }}
@@ -67,8 +64,8 @@ runs:
       shell: bash
       env:
         GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        INPUT_BLOCKING: ${{ inputs.blocking }}
         INPUT_DIRECTORY: ${{ inputs.directory }}
+        INPUT_PROJECT: ${{ inputs.project }}
         INPUT_REVIEW_COMMENTS: ${{ inputs.review-comments }}
         INPUT_SCOPE: ${{ inputs.scope }}
         INPUT_VERSION: ${{ inputs.version }}
@@ -101,7 +98,7 @@ runs:
             reviewComments: process.env.EFFECT_DOCTOR_REVIEW_COMMENTS,
           });
 
-    - name: Apply blocking policy
+    - name: Fail on Findings
       if: ${{ always() }}
       shell: bash
       env:

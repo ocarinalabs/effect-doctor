@@ -2,15 +2,179 @@
   "schema": "effect-doctor/comparison/v1",
   "kind": "comparison",
   "doctorVersion": "0.1.0",
+  "baseline": {
+    "doctorVersion": "0.1.0",
+    "engines": [
+      {
+        "analyzedFiles": ["src/old.ts"],
+        "complete": true,
+        "engine": "effect-doctor",
+        "version": "0.1.0"
+      },
+      {
+        "analyzedFiles": ["src/old.ts"],
+        "complete": true,
+        "engine": "effect-tsgo",
+        "version": "0.40.0"
+      }
+    ],
+    "policy": {
+      "activeRuleCount": 157,
+      "digest": "6e0f588e8d06811cce35190d3adc31f2eca4932912144b77822b393cbe09cd23",
+      "id": "effect-v4/default",
+      "revision": 3
+    },
+    "applicability": {
+      "files": [
+        {
+          "directEffectModuleReference": true,
+          "file": "src/old.ts"
+        }
+      ],
+      "normalizedDiagnosticCount": 1,
+      "notApplicable": {
+        "groups": [],
+        "total": 0
+      }
+    },
+    "target": {
+      "entry": "tsconfig.json",
+      "projects": ["tsconfig.json"]
+    },
+    "findings": [
+      {
+        "category": "effect-native",
+        "evidence": "console.log(value)",
+        "fingerprint": "3d628487684e5c23f373400c154bfbf5271d708978a97002409fd80863fcd7c1",
+        "location": {
+          "file": "src/old.ts",
+          "start": {
+            "line": 3,
+            "column": 1
+          },
+          "end": {
+            "line": 3,
+            "column": 19
+          }
+        },
+        "message": "Use Effect logging with structured fields.",
+        "provenance": {
+          "engine": "effect-doctor",
+          "nativeRuleId": "prefer-structured-log-data"
+        },
+        "ruleId": "effect-doctor/prefer-structured-log-data",
+        "severity": "warning",
+        "title": "Prefer structured Effect logging"
+      }
+    ],
+    "kind": "scan",
+    "root": ".",
+    "schema": "effect-doctor/scan/v1",
+    "summary": {
+      "errors": 0,
+      "warnings": 1
+    },
+    "toolchain": {
+      "effect": "4.0.0-rc.113",
+      "oxlint": "1.80.0",
+      "tsgo": "0.40.0",
+      "typescript": "7.0.2"
+    }
+  },
+  "candidate": {
+    "doctorVersion": "0.1.0",
+    "engines": [
+      {
+        "analyzedFiles": ["src/program.ts"],
+        "complete": true,
+        "engine": "effect-doctor",
+        "version": "0.1.0"
+      },
+      {
+        "analyzedFiles": ["src/program.ts"],
+        "complete": true,
+        "engine": "effect-tsgo",
+        "version": "0.40.0"
+      }
+    ],
+    "policy": {
+      "activeRuleCount": 157,
+      "digest": "6e0f588e8d06811cce35190d3adc31f2eca4932912144b77822b393cbe09cd23",
+      "id": "effect-v4/default",
+      "revision": 3
+    },
+    "applicability": {
+      "files": [
+        {
+          "directEffectModuleReference": true,
+          "file": "src/program.ts"
+        }
+      ],
+      "normalizedDiagnosticCount": 1,
+      "notApplicable": {
+        "groups": [],
+        "total": 0
+      }
+    },
+    "target": {
+      "entry": "tsconfig.json",
+      "projects": ["tsconfig.json"]
+    },
+    "findings": [
+      {
+        "category": "correctness",
+        "evidence": "Effect.runSync(program)",
+        "fingerprint": "9f17dd71c86bf03b1f87aacf1a79f7f2cf30504e87508625387977577f2d419b",
+        "location": {
+          "file": "src/program.ts",
+          "start": {
+            "line": 7,
+            "column": 3
+          },
+          "end": {
+            "line": 7,
+            "column": 26
+          }
+        },
+        "message": "This Effect can suspend and cannot be run synchronously.",
+        "provenance": {
+          "engine": "effect-doctor",
+          "nativeRuleId": "no-run-sync-on-suspending-effect"
+        },
+        "ruleId": "effect-doctor/no-run-sync-on-suspending-effect",
+        "severity": "error",
+        "title": "Avoid runSync for suspending Effects"
+      }
+    ],
+    "kind": "scan",
+    "root": ".",
+    "schema": "effect-doctor/scan/v1",
+    "summary": {
+      "errors": 1,
+      "warnings": 0
+    },
+    "toolchain": {
+      "effect": "4.0.0-rc.113",
+      "oxlint": "1.80.0",
+      "tsgo": "0.40.0",
+      "typescript": "7.0.2"
+    }
+  },
   "introduced": [
     {
       "category": "correctness",
       "evidence": "Effect.runSync(program)",
-      "fingerprint": "introduced",
+      "fingerprint": "9f17dd71c86bf03b1f87aacf1a79f7f2cf30504e87508625387977577f2d419b",
       "location": {
         "file": "src/program.ts",
-        "start": { "line": 7, "column": 3 },
-        "end": { "line": 7, "column": 26 }
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 26
+        }
       },
       "message": "This Effect can suspend and cannot be run synchronously.",
       "provenance": {
@@ -26,11 +190,17 @@
     {
       "category": "effect-native",
       "evidence": "console.log(value)",
-      "fingerprint": "resolved",
+      "fingerprint": "3d628487684e5c23f373400c154bfbf5271d708978a97002409fd80863fcd7c1",
       "location": {
         "file": "src/old.ts",
-        "start": { "line": 3, "column": 1 },
-        "end": { "line": 3, "column": 19 }
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 19
+        }
       },
       "message": "Use Effect logging with structured fields.",
       "provenance": {
@@ -41,5 +211,6 @@
       "severity": "warning",
       "title": "Prefer structured Effect logging"
     }
-  ]
+  ],
+  "unchangedCount": 0
 }
