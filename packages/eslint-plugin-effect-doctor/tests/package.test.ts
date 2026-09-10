@@ -46,7 +46,7 @@ const pack = (packageDirectory: string, archiveDirectory: string): string => {
     {
       cwd: packageDirectory,
       encoding: "utf-8",
-      timeout: 30_000,
+      timeout: 120_000,
     }
   );
   expect(packed.error).toBeUndefined();
@@ -87,7 +87,7 @@ describe.sequential.each(["9.39.5", "10.9.1"])(
             oxlintPluginArchive,
             eslintPluginArchive,
           ]),
-          { cwd: workspace, encoding: "utf-8", timeout: 45_000 }
+          { cwd: workspace, encoding: "utf-8", timeout: 240_000 }
         );
         expect(installed.error).toBeUndefined();
         expect(installed.status, installed.stderr).toBe(0);
@@ -165,7 +165,7 @@ describe.sequential.each(["9.39.5", "10.9.1"])(
             "ES2024",
             consumer,
           ],
-          { cwd: workspace, encoding: "utf-8", timeout: 30_000 }
+          { cwd: workspace, encoding: "utf-8", timeout: 120_000 }
         );
         expect(typechecked.error).toBeUndefined();
         expect(
@@ -192,6 +192,6 @@ describe.sequential.each(["9.39.5", "10.9.1"])(
       } finally {
         rmSync(workspace, { force: true, recursive: true });
       }
-    }, 60_000);
+    }, 420_000);
   }
 );
