@@ -62,8 +62,8 @@ const makeRepository = ({
   return {
     baseSha,
     holder,
-    repository: realpathSync(repository),
-    runnerTemp: realpathSync(runnerTemp),
+    repository: realpathSync.native(repository),
+    runnerTemp: realpathSync.native(runnerTemp),
   };
 };
 

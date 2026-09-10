@@ -30,7 +30,9 @@ import {
   renderSummary,
 } from "./report.mjs";
 
-const workspace = realpathSync(process.env.GITHUB_WORKSPACE ?? process.cwd());
+const workspace = realpathSync.native(
+  process.env.GITHUB_WORKSPACE ?? process.cwd()
+);
 const runnerTemp = process.env.RUNNER_TEMP ?? os.tmpdir();
 const outputFile = process.env.GITHUB_OUTPUT;
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -402,12 +404,12 @@ const projectEntry = (directory, projectInput) => {
 const resolveProject = (directoryInput, projectInput) => {
   const requestedDirectory = path.resolve(workspace, directoryInput);
   const directory = existsSync(requestedDirectory)
-    ? realpathSync(requestedDirectory)
+    ? realpathSync.native(requestedDirectory)
     : requestedDirectory;
   if (!existsSync(directory)) {
     throw new Error(`Project directory does not exist: ${directoryInput}`);
   }
-  const repositoryRoot = realpathSync(
+  const repositoryRoot = realpathSync.native(
     checkedGit(directory, ["rev-parse", "--show-toplevel"])
   );
   return {
