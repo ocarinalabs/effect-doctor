@@ -75,15 +75,37 @@ export const staticString = (
   return undefined;
 };
 
+type ResolvedReferences = ReadonlyMap<number, Variable | undefined>;
+
+const resolvedReferencesByProgram = new WeakMap<
+  ESTree.Program,
+  ResolvedReferences
+>();
+
+const resolvedReferences = (context: Context): ResolvedReferences => {
+  const program = context.sourceCode.ast;
+  const cached = resolvedReferencesByProgram.get(program);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const entries: (readonly [number, Variable | undefined])[] = [];
+  for (const scope of context.sourceCode.scopeManager.scopes) {
+    for (const reference of scope.references) {
+      entries.push([
+        reference.identifier.range[0],
+        reference.resolved ?? undefined,
+      ]);
+    }
+  }
+  const index = new Map(entries);
+  resolvedReferencesByProgram.set(program, index);
+  return index;
+};
+
 export const variableForReference = (
   context: Context,
   identifier: ESTree.IdentifierReference
-): Variable | undefined => {
-  const reference = context.sourceCode.scopeManager.scopes
-    .flatMap((scope) => scope.references)
-    .find((candidate) => candidate.identifier.range[0] === identifier.range[0]);
-  return reference?.resolved ?? undefined;
-};
+): Variable | undefined => resolvedReferences(context).get(identifier.range[0]);
 
 export const bindingForReference = <Binding>(
   context: Context,
@@ -128,43 +150,6 @@ export const collectImportBindings = <Binding>(
     }
   }
   return new Map(entries);
-};
-
-export const identifierHasBinding = <Binding>(
-  context: Context,
-  bindings: ReadonlyMap<number, Binding>,
-  expression: ESTree.Expression,
-  expected: Binding
-): boolean => {
-  const node = unwrapExpression(expression);
-  return (
-    node.type === "Identifier" &&
-    bindingForReference(context, bindings, node) === expected
-  );
-};
-
-export const importedExportName = (
-  context: Context,
-  bindings: ReadonlyMap<number, string>,
-  expression: ESTree.Expression
-): string | undefined => {
-  const node = unwrapExpression(expression);
-  if (node.type === "Identifier") {
-    const binding = bindingForReference(context, bindings, node);
-    return binding === "*" ? undefined : binding;
-  }
-  if (
-    node.type !== "MemberExpression" ||
-    node.computed ||
-    node.property.type !== "Identifier"
-  ) {
-    return undefined;
-  }
-  const owner = unwrapExpression(node.object);
-  return owner.type === "Identifier" &&
-    bindingForReference(context, bindings, owner) === "*"
-    ? node.property.name
-    : undefined;
 };
 
 export const namedMember = (

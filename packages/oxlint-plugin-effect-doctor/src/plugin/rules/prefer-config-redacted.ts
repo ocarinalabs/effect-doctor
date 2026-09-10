@@ -1,33 +1,26 @@
 import { defineRule } from "@oxlint/plugins";
 import type { Context, ESTree } from "@oxlint/plugins";
 
+import { staticString } from "../internal/ast.ts";
 import {
-  bindingForReference,
-  collectImportBindings,
-  identifierHasBinding,
-  namedMember,
-  staticString,
-  unwrapExpression,
-} from "./ast.ts";
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type { ModuleBindings } from "../internal/effect-module.ts";
 
-type ImportBinding =
-  | "config-namespace"
-  | "config-schema"
-  | "config-string"
-  | "effect-namespace"
-  | "schema-namespace"
-  | "schema-string";
+const CONFIG_MODULE = defineEffectModule("effect", "Config", [
+  "schema",
+  "String",
+]);
 
-const IMPORT_BINDINGS: ReadonlyMap<string, ImportBinding> = new Map([
-  ["effect:namespace", "effect-namespace"],
-  ["effect:named:Config", "config-namespace"],
-  ["effect:named:Schema", "schema-namespace"],
-  ["effect/Config:namespace", "config-namespace"],
-  ["effect/Config:named:schema", "config-schema"],
-  ["effect/Config:named:string", "config-string"],
-  ["effect/Schema:namespace", "schema-namespace"],
-  ["effect/Schema:named:NonEmptyString", "schema-string"],
-  ["effect/Schema:named:String", "schema-string"],
+const PLAIN_STRING_SCHEMAS: ReadonlySet<string> = new Set([
+  "NonEmptyString",
+  "String",
+]);
+
+const SCHEMA_MODULE = defineEffectModule("effect", "Schema", [
+  ...PLAIN_STRING_SCHEMAS,
 ]);
 
 const PUBLIC_SECRET_PATTERNS = [
@@ -49,105 +42,23 @@ const PRIVATE_SECRET_PATTERNS = [
   ["KEY", "ENCRYPTION"],
 ] as const;
 
-const isImportedConfigString = (
+const configOperation = (
   context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  callee: ESTree.Expression
-): boolean =>
-  callee.type === "Identifier" &&
-  bindingForReference(context, bindings, callee) === "config-string";
-
-const isImportedConfigSchema = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  callee: ESTree.Expression
-): boolean =>
-  callee.type === "Identifier" &&
-  bindingForReference(context, bindings, callee) === "config-schema";
-
-const isNamespaceConfigMember = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  callee: ESTree.Expression,
-  name: string
-): boolean => {
-  const member = namedMember(callee, name);
-  if (member === undefined) {
-    return false;
-  }
-  if (
-    identifierHasBinding(context, bindings, member.object, "config-namespace")
-  ) {
-    return true;
-  }
-  const configMember = namedMember(member.object, "Config");
-  return (
-    configMember !== undefined &&
-    identifierHasBinding(
-      context,
-      bindings,
-      configMember.object,
-      "effect-namespace"
-    )
-  );
-};
-
-const isConfigStringCall = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
+  bindings: ModuleBindings,
   call: ESTree.CallExpression
-): boolean => {
-  const callee = unwrapExpression(call.callee);
-  return (
-    isImportedConfigString(context, bindings, callee) ||
-    isNamespaceConfigMember(context, bindings, callee, "string")
-  );
-};
-
-const isConfigSchemaCall = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  call: ESTree.CallExpression
-): boolean => {
-  const callee = unwrapExpression(call.callee);
-  return (
-    isImportedConfigSchema(context, bindings, callee) ||
-    isNamespaceConfigMember(context, bindings, callee, "schema")
-  );
-};
+): string | undefined =>
+  moduleExportName(context, bindings, CONFIG_MODULE, call.callee);
 
 const isPlainStringSchema = (
   context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
+  bindings: ModuleBindings,
   argument: ESTree.Argument | undefined
 ): boolean => {
   if (argument === undefined || argument.type === "SpreadElement") {
     return false;
   }
-  const schema = unwrapExpression(argument);
-  if (schema.type === "Identifier") {
-    return bindingForReference(context, bindings, schema) === "schema-string";
-  }
-  const member =
-    namedMember(schema, "String") ?? namedMember(schema, "NonEmptyString");
-  if (member === undefined) {
-    return false;
-  }
-  if (
-    identifierHasBinding(context, bindings, member.object, "schema-namespace")
-  ) {
-    return true;
-  }
-  const schemaMember = namedMember(member.object, "Schema");
-  return (
-    schemaMember !== undefined &&
-    identifierHasBinding(
-      context,
-      bindings,
-      schemaMember.object,
-      "effect-namespace"
-    )
-  );
+  const name = moduleExportName(context, bindings, SCHEMA_MODULE, argument);
+  return name !== undefined && PLAIN_STRING_SCHEMAS.has(name);
 };
 
 const matchesTokenPattern = (
@@ -155,22 +66,44 @@ const matchesTokenPattern = (
   pattern: readonly string[]
 ): boolean => pattern.every((token) => tokens.has(token));
 
+const NON_SECRET_SUFFIXES: ReadonlySet<string> = new Set([
+  "COUNT",
+  "ENABLED",
+  "LENGTH",
+  "MS",
+  "PATH",
+  "SECONDS",
+  "TIMEOUT",
+  "TTL",
+  "URL",
+]);
+
+const normalizeName = (name: string): string =>
+  name
+    .replaceAll(/(?<lower>[a-z0-9])(?<upper>[A-Z])/gu, "$<lower>_$<upper>")
+    .toUpperCase()
+    .replaceAll(/[^A-Z0-9]+/gu, "_");
+
 const isSecretName = (name: string): boolean => {
-  const normalized = name.toUpperCase().replaceAll(/[^A-Z0-9]+/gu, "_");
-  const tokens = new Set(normalized.split("_").filter(Boolean));
+  const normalized = normalizeName(name);
+  if (normalized === "DATABASE_URL" || normalized.endsWith("_DATABASE_URL")) {
+    return true;
+  }
+  const tokens = normalized.split("_").filter(Boolean);
+  const last = tokens.at(-1);
+  if (last !== undefined && NON_SECRET_SUFFIXES.has(last)) {
+    return false;
+  }
+  const tokenSet = new Set(tokens);
   if (
     PUBLIC_SECRET_PATTERNS.some((pattern) =>
-      matchesTokenPattern(tokens, pattern)
+      matchesTokenPattern(tokenSet, pattern)
     )
   ) {
     return false;
   }
-  return (
-    PRIVATE_SECRET_PATTERNS.some((pattern) =>
-      matchesTokenPattern(tokens, pattern)
-    ) ||
-    normalized === "DATABASE_URL" ||
-    normalized.endsWith("_DATABASE_URL")
+  return PRIVATE_SECRET_PATTERNS.some((pattern) =>
+    matchesTokenPattern(tokenSet, pattern)
   );
 };
 
@@ -183,33 +116,33 @@ export const preferConfigRedacted = defineRule({
     type: "suggestion",
   },
   createOnce(context) {
-    let bindings: ReadonlyMap<number, ImportBinding> = new Map();
+    let configBindings: ModuleBindings = new Map();
+    let schemaBindings: ModuleBindings = new Map();
     return {
       before() {
-        bindings = collectImportBindings(
-          context.sourceCode.ast,
-          IMPORT_BINDINGS
-        );
+        configBindings = collectModuleBindings(context, CONFIG_MODULE);
+        schemaBindings = collectModuleBindings(context, SCHEMA_MODULE);
       },
       CallExpression(node) {
-        const stringName = staticString(node.arguments[0]);
-        if (
-          stringName !== undefined &&
-          isSecretName(stringName) &&
-          isConfigStringCall(context, bindings, node)
-        ) {
-          context.report({
-            message: `Use Config.redacted for secret configuration ${stringName}.`,
-            node,
-          });
+        const operation = configOperation(context, configBindings, node);
+        if (operation === "String") {
+          const stringName = staticString(node.arguments[0]);
+          if (stringName !== undefined && isSecretName(stringName)) {
+            context.report({
+              message: `Use Config.Redacted for secret configuration ${stringName}.`,
+              node,
+            });
+          }
+          return;
+        }
+        if (operation !== "schema") {
           return;
         }
         const schemaName = staticString(node.arguments[1]);
         if (
           schemaName === undefined ||
           !isSecretName(schemaName) ||
-          !isConfigSchemaCall(context, bindings, node) ||
-          !isPlainStringSchema(context, bindings, node.arguments[0])
+          !isPlainStringSchema(context, schemaBindings, node.arguments[0])
         ) {
           return;
         }

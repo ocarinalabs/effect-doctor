@@ -1,5 +1,4 @@
 import { defineConfig } from "oxlint";
-import { recommended as effectRecommended } from "oxlint-plugin-effect/presets/recommended";
 import core from "ultracite/oxlint/core";
 
 import { RECOMMENDED_RULES as effectDoctorRecommended } from "./packages/oxlint-plugin-effect-doctor/src/rules.ts";
@@ -13,10 +12,9 @@ export default defineConfig({
     "packages/*/vendor/**",
   ],
   jsPlugins: [
-    "oxlint-plugin-effect/plugin",
     {
       name: "effect-doctor",
-      specifier: "./packages/oxlint-plugin-effect-doctor/src/index.ts",
+      specifier: "./packages/oxlint-plugin-effect-doctor/dist/index.js",
     },
   ],
   overrides: [
@@ -24,47 +22,19 @@ export default defineConfig({
       files: ["packages/*/src/**/*.ts"],
       rules: {
         ...effectDoctorRecommended,
-        ...effectRecommended,
-        "effect/noConditionalEmptyObjectSpread": "off",
-        "effect/noNewError": "off",
-        "effect/noNullish": "off",
-        "effect/noTernary": "off",
-        "effect/noThrowStatement": "off",
-        "effect/noTryCatch": "off",
-      },
-    },
-    {
-      files: [
-        "packages/*/src/internal/**/*.ts",
-        "packages/effect-doctor/src/bin.ts",
-        "packages/oxlint-plugin-effect-doctor/src/plugin/**/*.ts",
-      ],
-      rules: {
-        "effect/noAs": "off",
-        "effect/noDynamicImports": "off",
-        "effect/noGlobals": "off",
-        "effect/noInlineProvide": "off",
-        "effect/noKnownValueWidening": "off",
-        "effect/noNodeBuiltinImport": "off",
-        "effect/noNullish": "off",
-        "effect/noRuntimeTypeof": "off",
-      },
-    },
-    {
-      files: [
-        "packages/effect-doctor/src/cli.ts",
-        "packages/effect-doctor/src/render.ts",
-      ],
-      rules: {
-        "effect/noGlobals": "off",
-        "effect/noNullish": "off",
       },
     },
     {
       files: ["packages/*/tests/**/*.ts"],
       rules: {
-        "effect/noModuleMocks": "error",
-        "effect/noTestLifecycleHooks": "error",
+        "effect-doctor/no-module-mocks": "error",
+      },
+    },
+    {
+      files: ["**/tests/**", "apps/www/**"],
+      rules: {
+        "max-lines-per-function": "off",
+        "max-nested-callbacks": "off",
       },
     },
     {
@@ -75,14 +45,17 @@ export default defineConfig({
     },
   ],
   rules: {
-    "effect/noNewError": "off",
-    "effect/noNullish": "off",
-    "effect/noTernary": "off",
-    "effect/noThrowStatement": "off",
-    "effect/noTryCatch": "off",
+    complexity: ["error", { max: 10 }],
     "func-names": "off",
     "import/extensions": "off",
     "max-classes-per-file": ["error", 12],
+    "max-depth": ["error", 3],
+    "max-lines-per-function": [
+      "error",
+      { max: 60, skipBlankLines: true, skipComments: true },
+    ],
+    "max-nested-callbacks": ["error", 3],
+    "max-params": ["error", 4],
     "no-redeclare": "off",
     "no-shadow": "off",
     "no-use-before-define": "off",
@@ -94,7 +67,6 @@ export default defineConfig({
     "unicorn/import-style": "off",
     "unicorn/no-array-sort": "off",
     "unicorn/no-useless-undefined": "off",
-    // Schema.TaggedError is a class factory and must not be constructed here.
     "unicorn/throw-new-error": "off",
   },
 });

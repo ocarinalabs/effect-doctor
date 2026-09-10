@@ -1,6 +1,10 @@
 import { Effect } from "effect";
 import { HttpClient } from "effect/unstable/http";
-import { get as httpGet } from "effect/unstable/http/HttpClient";
+import * as Http from "effect/unstable/http";
+import {
+  get as httpGet,
+  HttpClient as HttpClientService,
+} from "effect/unstable/http/HttpClient";
 import { SqlClient } from "effect/unstable/sql";
 import { SqlClient as SqlClientService } from "effect/unstable/sql/SqlClient";
 
@@ -71,6 +75,54 @@ export const httpClientInsideTransactionGenerator = Effect.gen(function* () {
     Effect.gen(function* () {
       return yield* HttpClient.get("https://example.com/gen");
     })
+  );
+});
+
+export const serviceClientInsideTransaction = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const client = yield* HttpClient.HttpClient;
+  return yield* sql.withTransaction(
+    client.get("https://example.com/service-in-transaction")
+  );
+});
+
+export const namedServiceClientInsideTransaction = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const http = yield* HttpClientService;
+  return yield* sql.withTransaction(
+    Effect.gen(function* () {
+      return yield* http.post(
+        "https://example.com/named-service-in-transaction"
+      );
+    })
+  );
+});
+
+export const packageHttpClientInsideTransaction = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  return yield* sql.withTransaction(
+    Http.HttpClient.get("https://example.com/package-in-transaction")
+  );
+});
+
+export const serviceClientBeforeTransaction = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  const client = yield* HttpClient.HttpClient;
+  const response = yield* client.get(
+    "https://example.com/service-before-transaction"
+  );
+  yield* sql.withTransaction(sql`SELECT 1`);
+  return response;
+});
+
+const clientLookalike = {
+  get: (url: string) => Effect.succeed(url),
+};
+
+export const lookalikeClientInsideTransaction = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  return yield* sql.withTransaction(
+    clientLookalike.get("https://example.com/lookalike-in-transaction")
   );
 });
 

@@ -1,9 +1,12 @@
 import { defineRule } from "@oxlint/plugins";
 
-import { collectImportBindings } from "./ast.ts";
-import { EFFECT_IMPORT_BINDINGS, effectExportName } from "./effect-imports.ts";
-import type { EffectImportBinding } from "./effect-imports.ts";
-import { jsonStringifyCall } from "./json.ts";
+import { collectImportBindings } from "../internal/ast.ts";
+import {
+  EFFECT_IMPORT_BINDINGS,
+  effectExportName,
+} from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
+import { jsonStringifyCall } from "../internal/json.ts";
 
 const LOG_FUNCTIONS: ReadonlySet<string> = new Set([
   "log",

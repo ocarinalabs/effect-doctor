@@ -2,14 +2,19 @@ import { defineRule } from "@oxlint/plugins";
 import type { Context, Definition, ESTree, Variable } from "@oxlint/plugins";
 
 import {
-  collectImportBindings,
-  importedExportName,
   namedMember,
   unwrapExpression,
   variableForReference,
-} from "./ast.ts";
+} from "../internal/ast.ts";
+import {
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type { ModuleBindings } from "../internal/effect-module.ts";
 
-type LayerImportBinding = "*" | string;
+type LayerImportBinding =
+  ModuleBindings extends ReadonlyMap<number, infer B> ? B : never;
 
 const COMPOSITION_OPERATIONS = new Set([
   "merge",
@@ -20,15 +25,8 @@ const COMPOSITION_OPERATIONS = new Set([
 
 const LAYER_OPERATIONS = new Set([...COMPOSITION_OPERATIONS, "fresh"]);
 
-const LAYER_IMPORT_BINDINGS: ReadonlyMap<string, LayerImportBinding> = new Map([
-  ["effect:named:Layer", "*"],
-  ["effect/Layer:namespace", "*"],
-  ...[...LAYER_OPERATIONS].map(
-    (operation): readonly [string, LayerImportBinding] => [
-      `effect/Layer:named:${operation}`,
-      operation,
-    ]
-  ),
+const LAYER_MODULE = defineEffectModule("effect", "Layer", [
+  ...LAYER_OPERATIONS,
 ]);
 
 const argumentExpressions = (
@@ -44,9 +42,7 @@ const directLayerOperation = (
   bindings: ReadonlyMap<number, LayerImportBinding>,
   node: ESTree.CallExpression
 ): string | undefined =>
-  node.callee.type === "Super"
-    ? undefined
-    : importedExportName(context, bindings, node.callee);
+  moduleExportName(context, bindings, LAYER_MODULE, node.callee);
 
 const directCompositionOperation = (
   context: Context,
@@ -297,10 +293,7 @@ export const noDuplicateLayerFactoryCall = defineRule({
     return {
       before() {
         claimedComposers.clear();
-        imports = collectImportBindings(
-          context.sourceCode.ast,
-          LAYER_IMPORT_BINDINGS
-        );
+        imports = collectModuleBindings(context, LAYER_MODULE);
       },
       CallExpression(node) {
         if (

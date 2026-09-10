@@ -4,14 +4,23 @@ import type { Context, ESTree } from "@oxlint/plugins";
 import {
   collectImportBindings,
   delegatedYield,
-  importedExportName,
   unwrapExpression,
-} from "./ast.ts";
-import { effectGeneratorFunction } from "./effect-generator.ts";
-import { EFFECT_IMPORT_BINDINGS, effectExportName } from "./effect-imports.ts";
-import type { EffectImportBinding } from "./effect-imports.ts";
-
-type ModuleImportBinding = "*" | string;
+} from "../internal/ast.ts";
+import { effectGeneratorFunction } from "../internal/effect-generator.ts";
+import {
+  EFFECT_IMPORT_BINDINGS,
+  effectExportName,
+} from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
+import {
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type {
+  EffectModule,
+  ModuleBindings,
+} from "../internal/effect-module.ts";
 
 const LAYER_EFFECT_CONSTRUCTORS = new Set([
   "effect",
@@ -19,37 +28,17 @@ const LAYER_EFFECT_CONSTRUCTORS = new Set([
   "effectDiscard",
 ]);
 
-const LAYER_IMPORT_BINDINGS: ReadonlyMap<string, ModuleImportBinding> = new Map(
-  [
-    ["effect:named:Layer", "*"],
-    ["effect/Layer:namespace", "*"],
-    ...[...LAYER_EFFECT_CONSTRUCTORS].map(
-      (operation): readonly [string, ModuleImportBinding] => [
-        `effect/Layer:named:${operation}`,
-        operation,
-      ]
-    ),
-  ]
-);
+const LAYER_MODULE = defineEffectModule("effect", "Layer", [
+  ...LAYER_EFFECT_CONSTRUCTORS,
+]);
 
 const LONG_LIVED_STREAM_SOURCES = new Set(["forever", "never"]);
 const STREAM_CONSUMERS = new Set(["runDrain", "runForEach"]);
-const STREAM_OPERATIONS = new Set([
+
+const STREAM_MODULE = defineEffectModule("effect", "Stream", [
   ...LONG_LIVED_STREAM_SOURCES,
   ...STREAM_CONSUMERS,
 ]);
-
-const STREAM_IMPORT_BINDINGS: ReadonlyMap<string, ModuleImportBinding> =
-  new Map([
-    ["effect:named:Stream", "*"],
-    ["effect/Stream:namespace", "*"],
-    ...[...STREAM_OPERATIONS].map(
-      (operation): readonly [string, ModuleImportBinding] => [
-        `effect/Stream:named:${operation}`,
-        operation,
-      ]
-    ),
-  ]);
 
 const argumentAt = (
   node: ESTree.CallExpression,
@@ -63,13 +52,15 @@ const argumentAt = (
 
 const layerEffectArgument = (
   context: Context,
-  bindings: ReadonlyMap<number, ModuleImportBinding>,
+  bindings: ModuleBindings,
   node: ESTree.CallExpression
 ): ESTree.Expression | undefined => {
-  if (node.callee.type === "Super") {
-    return undefined;
-  }
-  const operation = importedExportName(context, bindings, node.callee);
+  const operation = moduleExportName(
+    context,
+    bindings,
+    LAYER_MODULE,
+    node.callee
+  );
   if (operation === "effect") {
     return argumentAt(node, 1);
   }
@@ -108,36 +99,35 @@ const topLevelYields = (
   return body.body.flatMap(yieldsFromStatement);
 };
 
-const importedCallName = (
+const moduleName = (
   context: Context,
-  bindings: ReadonlyMap<number, ModuleImportBinding>,
-  node: ESTree.CallExpression
+  bindings: ModuleBindings,
+  module: EffectModule,
+  expression: ESTree.Expression | ESTree.Super
 ): string | undefined =>
-  node.callee.type === "Super"
-    ? undefined
-    : importedExportName(context, bindings, node.callee);
+  moduleExportName(context, bindings, module, expression);
 
 const streamSourceName = (
   context: Context,
-  bindings: ReadonlyMap<number, ModuleImportBinding>,
+  bindings: ModuleBindings,
   expression: ESTree.Expression
 ): string | undefined => {
   const node = unwrapExpression(expression);
   return node.type === "CallExpression"
-    ? importedCallName(context, bindings, node)
-    : importedExportName(context, bindings, node);
+    ? moduleName(context, bindings, STREAM_MODULE, node.callee)
+    : moduleName(context, bindings, STREAM_MODULE, node);
 };
 
 const unboundedStreamRun = (
   context: Context,
-  bindings: ReadonlyMap<number, ModuleImportBinding>,
+  bindings: ModuleBindings,
   expression: ESTree.Expression
 ): ESTree.CallExpression | undefined => {
   const node = unwrapExpression(expression);
   if (node.type !== "CallExpression") {
     return undefined;
   }
-  const operation = importedCallName(context, bindings, node);
+  const operation = moduleName(context, bindings, STREAM_MODULE, node.callee);
   if (operation === undefined || !STREAM_CONSUMERS.has(operation)) {
     return undefined;
   }
@@ -154,7 +144,7 @@ const unboundedStreamRun = (
 const knownLongLivedExpression = (
   context: Context,
   effectBindings: ReadonlyMap<number, EffectImportBinding>,
-  streamBindings: ReadonlyMap<number, ModuleImportBinding>,
+  streamBindings: ModuleBindings,
   expression: ESTree.Expression
 ): ESTree.Expression | undefined => {
   const node = unwrapExpression(expression);
@@ -163,7 +153,6 @@ const knownLongLivedExpression = (
   }
   if (
     node.type === "CallExpression" &&
-    node.callee.type !== "Super" &&
     effectExportName(context, effectBindings, node.callee) === "forever"
   ) {
     return node;
@@ -204,8 +193,8 @@ export const noLongLivedLayerAcquisition = defineRule({
   },
   createOnce(context) {
     let effectBindings: ReadonlyMap<number, EffectImportBinding> = new Map();
-    let layerBindings: ReadonlyMap<number, ModuleImportBinding> = new Map();
-    let streamBindings: ReadonlyMap<number, ModuleImportBinding> = new Map();
+    let layerBindings: ModuleBindings = new Map();
+    let streamBindings: ModuleBindings = new Map();
 
     return {
       before() {
@@ -213,14 +202,8 @@ export const noLongLivedLayerAcquisition = defineRule({
           context.sourceCode.ast,
           EFFECT_IMPORT_BINDINGS
         );
-        layerBindings = collectImportBindings(
-          context.sourceCode.ast,
-          LAYER_IMPORT_BINDINGS
-        );
-        streamBindings = collectImportBindings(
-          context.sourceCode.ast,
-          STREAM_IMPORT_BINDINGS
-        );
+        layerBindings = collectModuleBindings(context, LAYER_MODULE);
+        streamBindings = collectModuleBindings(context, STREAM_MODULE);
       },
       CallExpression(node) {
         const acquisition = layerEffectArgument(context, layerBindings, node);

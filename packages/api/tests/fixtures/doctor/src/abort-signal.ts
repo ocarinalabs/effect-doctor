@@ -1,4 +1,5 @@
-import { Effect, tryPromise } from "effect";
+import { Effect } from "effect";
+import { tryPromise } from "effect/Effect";
 
 export const missingSignal = Effect.promise(() =>
   fetch("https://example.com/missing")

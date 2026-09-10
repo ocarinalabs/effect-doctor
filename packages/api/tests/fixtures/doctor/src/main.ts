@@ -2,26 +2,26 @@
 import * as EffectNamespace from "effect";
 import { Config, Config as AppConfig, Schema } from "effect";
 import * as ConfigModule from "effect/Config";
-import { string as configString } from "effect/Config";
+import { String as configString } from "effect/Config";
 import * as SchemaModule from "effect/Schema";
 import { String as SchemaString } from "effect/Schema";
 
-export const password = Config.string("DATABASE_PASSWORD");
-export const token = AppConfig.string("SERVICE_TOKEN");
-export const signingKey = EffectNamespace.Config.string("SIGNING_KEY");
-export const privateKey = ConfigModule.string("PRIVATE_KEY");
+export const password = Config.String("DATABASE_PASSWORD");
+export const token = AppConfig.String("SERVICE_TOKEN");
+export const signingKey = EffectNamespace.Config.String("SIGNING_KEY");
+export const privateKey = ConfigModule.String("PRIVATE_KEY");
 export const apiSecret = configString("API_SECRET");
-export const parenthesizedSecret = Config.string(("PARENTHESIZED_SECRET"));
-export const assertedSecret = Config.string("ASSERTED_SECRET" as string);
-export const nonNullSecret = Config.string("NON_NULL_SECRET"!);
-export const satisfiesSecret = Config.string(
+export const parenthesizedSecret = Config.String(("PARENTHESIZED_SECRET"));
+export const assertedSecret = Config.String("ASSERTED_SECRET" as string);
+export const nonNullSecret = Config.String("NON_NULL_SECRET"!);
+export const satisfiesSecret = Config.String(
   "SATISFIES_SECRET" satisfies string
 );
-export const typeAssertionSecret = Config.string(
+export const typeAssertionSecret = Config.String(
   <string>"TYPE_ASSERTION_SECRET"
 );
-export const templateSecret = Config.string(`TEMPLATE_SECRET`);
-export const wrappedCalleeSecret = ((Config.string))("WRAPPED_CALLEE_SECRET");
+export const templateSecret = Config.String(`TEMPLATE_SECRET`);
+export const wrappedCalleeSecret = ((Config.String))("WRAPPED_CALLEE_SECRET");
 export const schemaPassword = Config.schema(
   Schema.String,
   "SCHEMA_PASSWORD"
@@ -43,11 +43,11 @@ export const importedSchemaAccessKey = Config.schema(
   "IMPORTED_ACCESS_KEY"
 );
 
-export const publicKey = Config.string("PUBLIC_API_KEY");
-export const publishableKey = Config.string("STRIPE_PUBLISHABLE_KEY");
-export const clientId = Config.string("OAUTH_CLIENT_ID");
-export const dynamicName = Config.string(process.env.CONFIG_NAME);
-export const dynamicTemplateName = Config.string(`${process.env.CONFIG_NAME}`);
+export const publicKey = Config.String("PUBLIC_API_KEY");
+export const publishableKey = Config.String("STRIPE_PUBLISHABLE_KEY");
+export const clientId = Config.String("OAUTH_CLIENT_ID");
+export const dynamicName = Config.String(process.env.CONFIG_NAME);
+export const dynamicTemplateName = Config.String(`${process.env.CONFIG_NAME}`);
 export const redactedSchema = Config.schema(
   Schema.Redacted(Schema.String),
   "SAFE_PASSWORD"
@@ -63,7 +63,7 @@ export const opaqueRedactedSchema = Config.schema(
 );
 
 export const shadowed = (Config: { readonly string: (name: string) => string }) =>
-  Config.string("LOCAL_SECRET");
+  Config.String("LOCAL_SECRET");
 
 // @ts-expect-error deliberate first-party liveness fixture
 export const mismatch: number = "one";
@@ -75,3 +75,9 @@ export const suppressionLookalike =
 export const suppressionTemplateLookalike =
   `example: ${"oxlint-disable-line imaginary/lookalike"}`;
 // Documentation example: oxlint-disable-line imaginary/lookalike
+export const ttl = Config.String("TOKEN_TTL_SECONDS");
+export const santa = Config.String("SECRET_SANTA_ENABLED");
+export const minLength = Config.String("PASSWORD_MIN_LENGTH");
+export const resetUrl = Config.String("PASSWORD_RESET_URL");
+export const keyPath = Config.String("PRIVATE_KEY_PATH");
+export const apiKey = Config.String("apiKey");

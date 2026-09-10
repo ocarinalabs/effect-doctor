@@ -2,20 +2,18 @@ import { defineRule } from "@oxlint/plugins";
 import type { Context, ESTree, Variable } from "@oxlint/plugins";
 
 import {
-  collectImportBindings,
-  importedExportName,
   isFunctionBoundary,
   unwrapExpression,
   variableForReference,
-} from "./ast.ts";
+} from "../internal/ast.ts";
+import {
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type { ModuleBindings } from "../internal/effect-module.ts";
 
-type ChunkImportBinding = "*" | "fromArrayUnsafe";
-
-const CHUNK_IMPORT_BINDINGS: ReadonlyMap<string, ChunkImportBinding> = new Map([
-  ["effect:named:Chunk", "*"],
-  ["effect/Chunk:namespace", "*"],
-  ["effect/Chunk:named:fromArrayUnsafe", "fromArrayUnsafe"],
-]);
+const CHUNK_MODULE = defineEffectModule("effect", "Chunk", ["fromArrayUnsafe"]);
 
 const MUTATING_ARRAY_METHODS: ReadonlySet<string> = new Set([
   "copyWithin",
@@ -33,15 +31,18 @@ const mutationMessage =
   "Do not mutate this array after passing it to Chunk.fromArrayUnsafe because the Chunk shares its backing storage.";
 
 const directIdentifier = (
-  expression: ESTree.Expression
+  expression: ESTree.Expression | ESTree.Super
 ): ESTree.IdentifierReference | undefined => {
+  if (expression.type === "Super") {
+    return undefined;
+  }
   const node = unwrapExpression(expression);
   return node.type === "Identifier" ? node : undefined;
 };
 
 const localVariable = (
   context: Context,
-  expression: ESTree.Expression
+  expression: ESTree.Expression | ESTree.Super
 ): Variable | undefined => {
   const identifier = directIdentifier(expression);
   if (identifier === undefined) {
@@ -56,13 +57,15 @@ const localVariable = (
 
 const unsafeWrappedVariable = (
   context: Context,
-  bindings: ReadonlyMap<number, ChunkImportBinding>,
+  bindings: ModuleBindings,
   node: ESTree.CallExpression
 ): Variable | undefined => {
-  if (node.callee.type === "Super") {
-    return undefined;
-  }
-  const operation = importedExportName(context, bindings, node.callee);
+  const operation = moduleExportName(
+    context,
+    bindings,
+    CHUNK_MODULE,
+    node.callee
+  );
   if (operation !== "fromArrayUnsafe") {
     return undefined;
   }
@@ -71,14 +74,6 @@ const unsafeWrappedVariable = (
     ? undefined
     : localVariable(context, argument);
 };
-
-const directMemberVariable = (
-  context: Context,
-  member: ESTree.MemberExpression
-): Variable | undefined =>
-  member.object.type === "Super"
-    ? undefined
-    : localVariable(context, member.object);
 
 const mutatingMethodVariable = (
   context: Context,
@@ -96,27 +91,25 @@ const mutatingMethodVariable = (
   }
   const method = callee.computed ? undefined : callee.property.name;
   return method !== undefined && MUTATING_ARRAY_METHODS.has(method)
-    ? directMemberVariable(context, callee)
+    ? localVariable(context, callee.object)
     : undefined;
 };
 
-const assignedMemberVariable = (
+const memberTargetVariable = (
+  context: Context,
+  target: ESTree.AssignmentTarget | ESTree.SimpleAssignmentTarget
+): Variable | undefined =>
+  target.type === "MemberExpression"
+    ? localVariable(context, target.object)
+    : undefined;
+
+const reassignedVariable = (
   context: Context,
   target: ESTree.AssignmentTarget
 ): Variable | undefined =>
-  target.type === "MemberExpression"
-    ? directMemberVariable(context, target)
-    : undefined;
+  target.type === "Identifier" ? localVariable(context, target) : undefined;
 
-const updatedMemberVariable = (
-  context: Context,
-  target: ESTree.SimpleAssignmentTarget
-): Variable | undefined =>
-  target.type === "MemberExpression"
-    ? directMemberVariable(context, target)
-    : undefined;
-
-type WrapsByBoundary = ReadonlyMap<Variable, ReadonlyMap<number, number>>;
+type WrapEnds = Map<Variable, Map<number, number>>;
 
 const executionBoundaryStart = (node: ESTree.Node): number | undefined => {
   let ancestor: ESTree.Node | null = node.parent;
@@ -130,7 +123,7 @@ const executionBoundaryStart = (node: ESTree.Node): number | undefined => {
 };
 
 const wasWrappedEarlier = (
-  wraps: WrapsByBoundary,
+  wraps: WrapEnds,
   variable: Variable | undefined,
   mutation: ESTree.Node
 ): boolean => {
@@ -143,7 +136,7 @@ const wasWrappedEarlier = (
 };
 
 const recordWrap = (
-  wraps: Map<Variable, Map<number, number>>,
+  wraps: WrapEnds,
   variable: Variable,
   node: ESTree.CallExpression
 ): void => {
@@ -162,6 +155,18 @@ const recordWrap = (
   wraps.set(variable, boundaries);
 };
 
+const forgetWrap = (
+  wraps: WrapEnds,
+  variable: Variable | undefined,
+  node: ESTree.Node
+): void => {
+  const boundary = executionBoundaryStart(node);
+  if (variable === undefined || boundary === undefined) {
+    return;
+  }
+  wraps.get(variable)?.delete(boundary);
+};
+
 export const noMutationAfterUnsafeChunkWrap = defineRule({
   meta: {
     docs: {
@@ -171,8 +176,8 @@ export const noMutationAfterUnsafeChunkWrap = defineRule({
     type: "problem",
   },
   createOnce(context) {
-    let bindings: ReadonlyMap<number, ChunkImportBinding> = new Map();
-    const wraps = new Map<Variable, Map<number, number>>();
+    let bindings: ModuleBindings = new Map();
+    const wraps: WrapEnds = new Map();
 
     const reportIfWrapped = (
       node:
@@ -189,10 +194,7 @@ export const noMutationAfterUnsafeChunkWrap = defineRule({
     return {
       before() {
         wraps.clear();
-        bindings = collectImportBindings(
-          context.sourceCode.ast,
-          CHUNK_IMPORT_BINDINGS
-        );
+        bindings = collectModuleBindings(context, CHUNK_MODULE);
       },
       CallExpression(node) {
         const wrapped = unsafeWrappedVariable(context, bindings, node);
@@ -203,10 +205,13 @@ export const noMutationAfterUnsafeChunkWrap = defineRule({
         reportIfWrapped(node, mutatingMethodVariable(context, node));
       },
       AssignmentExpression(node) {
-        reportIfWrapped(node, assignedMemberVariable(context, node.left));
+        reportIfWrapped(node, memberTargetVariable(context, node.left));
+        if (node.operator === "=") {
+          forgetWrap(wraps, reassignedVariable(context, node.left), node);
+        }
       },
       UpdateExpression(node) {
-        reportIfWrapped(node, updatedMemberVariable(context, node.argument));
+        reportIfWrapped(node, memberTargetVariable(context, node.argument));
       },
     };
   },

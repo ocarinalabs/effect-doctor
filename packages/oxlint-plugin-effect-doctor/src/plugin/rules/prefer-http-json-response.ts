@@ -1,40 +1,18 @@
 import { defineRule } from "@oxlint/plugins";
-import type { Context, ESTree } from "@oxlint/plugins";
 
 import {
-  bindingForReference,
-  collectImportBindings,
-  identifierHasBinding,
-  namedMember,
-  unwrapExpression,
-} from "./ast.ts";
-import { jsonStringifyCall } from "./json.ts";
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type { ModuleBindings } from "../internal/effect-module.ts";
+import { jsonStringifyCall } from "../internal/json.ts";
 
-type HttpResponseBinding = "namespace" | "text";
-
-const HTTP_RESPONSE_IMPORTS: ReadonlyMap<string, HttpResponseBinding> = new Map(
-  [
-    ["effect/unstable/http:named:HttpServerResponse", "namespace"],
-    ["effect/unstable/http/HttpServerResponse:namespace", "namespace"],
-    ["effect/unstable/http/HttpServerResponse:named:text", "text"],
-  ]
+const HTTP_SERVER_RESPONSE_MODULE = defineEffectModule(
+  "effect/unstable/http",
+  "HttpServerResponse",
+  ["text"]
 );
-
-const isTextResponse = (
-  context: Context,
-  bindings: ReadonlyMap<number, HttpResponseBinding>,
-  expression: ESTree.Expression
-): boolean => {
-  const callee = unwrapExpression(expression);
-  if (callee.type === "Identifier") {
-    return bindingForReference(context, bindings, callee) === "text";
-  }
-  const member = namedMember(callee, "text");
-  return (
-    member !== undefined &&
-    identifierHasBinding(context, bindings, member.object, "namespace")
-  );
-};
 
 export const preferHttpJsonResponse = defineRule({
   meta: {
@@ -45,16 +23,20 @@ export const preferHttpJsonResponse = defineRule({
     type: "suggestion",
   },
   createOnce(context) {
-    let bindings: ReadonlyMap<number, HttpResponseBinding> = new Map();
+    let bindings: ModuleBindings = new Map();
     return {
       before() {
-        bindings = collectImportBindings(
-          context.sourceCode.ast,
-          HTTP_RESPONSE_IMPORTS
-        );
+        bindings = collectModuleBindings(context, HTTP_SERVER_RESPONSE_MODULE);
       },
       CallExpression(node) {
-        if (!isTextResponse(context, bindings, node.callee)) {
+        if (
+          moduleExportName(
+            context,
+            bindings,
+            HTTP_SERVER_RESPONSE_MODULE,
+            node.callee
+          ) !== "text"
+        ) {
           return;
         }
         const [body] = node.arguments;

@@ -1,7 +1,7 @@
 import { defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
-import { makeSqlClientTracker } from "./sql-client.ts";
+import { makeSqlClientTracker } from "../internal/sql-client.ts";
 
 const TRANSACTION_CONTROL =
   /^(?:BEGIN(?:\s+TRANSACTION)?|COMMIT|ROLLBACK(?:\s+TO)?|SAVEPOINT|RELEASE\s+SAVEPOINT)\b/iu;

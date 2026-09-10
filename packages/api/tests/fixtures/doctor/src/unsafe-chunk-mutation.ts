@@ -1,9 +1,14 @@
 import { Chunk } from "effect";
+import * as EffectPackage from "effect";
 import {
   fromArrayUnsafe as unsafeFromArray,
   fromIterable,
 } from "effect/Chunk";
 import * as ChunkModule from "effect/Chunk";
+
+const packagePushed = [1, 2, 3];
+export const packageChunk = EffectPackage.Chunk.fromArrayUnsafe(packagePushed);
+packagePushed.push(4);
 
 const pushed = [1, 2, 3];
 export const pushedChunk = Chunk.fromArrayUnsafe(pushed);
@@ -39,6 +44,15 @@ alias.push(4);
 let reassigned = [1, 2, 3];
 export const reassignedChunk = Chunk.fromArrayUnsafe(reassigned);
 reassigned = [4, 5, 6];
+reassigned.push(7);
+
+let rewrapped = [1, 2];
+export const rewrappedChunk = Chunk.fromArrayUnsafe(rewrapped);
+rewrapped.push(3);
+rewrapped = [];
+rewrapped.push(4);
+export const rewrappedAgain = Chunk.fromArrayUnsafe(rewrapped);
+rewrapped.push(5);
 
 const safelyCopied = [1, 2, 3];
 export const copiedChunk = fromIterable(safelyCopied);

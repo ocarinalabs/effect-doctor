@@ -1,23 +1,14 @@
 import { defineRule } from "@oxlint/plugins";
 import type { Context, ESTree, Variable } from "@oxlint/plugins";
 
+import { collectImportBindings, unwrapExpression } from "../internal/ast.ts";
 import {
-  bindingForReference,
-  collectImportBindings,
-  identifierHasBinding,
-  namedMember,
-  unwrapExpression,
-} from "./ast.ts";
+  EFFECT_IMPORT_BINDINGS,
+  effectExportName,
+} from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
 
 type CallbackFunction = ESTree.ArrowFunctionExpression | ESTree.Function;
-type ImportBinding = "callback" | "effect-module" | "effect-package";
-
-const IMPORT_BINDINGS: ReadonlyMap<string, ImportBinding> = new Map([
-  ["effect:namespace", "effect-package"],
-  ["effect:named:Effect", "effect-module"],
-  ["effect/Effect:namespace", "effect-module"],
-  ["effect/Effect:named:callback", "callback"],
-]);
 
 const callbackFunction = (
   argument: ESTree.Argument | undefined
@@ -32,64 +23,11 @@ const callbackFunction = (
     : undefined;
 };
 
-const hasImportBinding = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  expression: ESTree.Expression | ESTree.Super,
-  expected: ImportBinding
-): boolean =>
-  expression.type !== "Super" &&
-  identifierHasBinding(context, bindings, expression, expected);
-
-const isImportedCallbackIdentifier = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  callee: ESTree.Expression
-): boolean =>
-  callee.type === "Identifier" &&
-  bindingForReference(context, bindings, callee) === "callback";
-
-const isEffectModuleCallback = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  callbackMember: ESTree.MemberExpression
-): boolean =>
-  hasImportBinding(context, bindings, callbackMember.object, "effect-module");
-
-const isEffectPackageCallback = (
-  context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
-  callbackMember: ESTree.MemberExpression
-): boolean => {
-  if (callbackMember.object.type === "Super") {
-    return false;
-  }
-  const effectMember = namedMember(callbackMember.object, "Effect");
-  return (
-    effectMember !== undefined &&
-    hasImportBinding(context, bindings, effectMember.object, "effect-package")
-  );
-};
-
 const isEffectCallback = (
   context: Context,
-  bindings: ReadonlyMap<number, ImportBinding>,
+  bindings: ReadonlyMap<number, EffectImportBinding>,
   node: ESTree.CallExpression
-): boolean => {
-  if (node.callee.type === "Super") {
-    return false;
-  }
-  const callee = unwrapExpression(node.callee);
-  if (isImportedCallbackIdentifier(context, bindings, callee)) {
-    return true;
-  }
-  const callbackMember = namedMember(callee, "callback");
-  return (
-    callbackMember !== undefined &&
-    (isEffectModuleCallback(context, bindings, callbackMember) ||
-      isEffectPackageCallback(context, bindings, callbackMember))
-  );
-};
+): boolean => effectExportName(context, bindings, node.callee) === "callback";
 
 const continuationVariable = (
   context: Context,
@@ -193,7 +131,7 @@ const callsGroupedByBlock = (
 const reportRepeat = (context: Context, call: ESTree.CallExpression): void => {
   context.report({
     message:
-      "Call the Effect.callback continuation at most once along this path; later resumes are ignored.",
+      "Call the Effect.callback continuation at most once along this path. Effect ignores later resumes.",
     node: call,
   });
 };
@@ -239,12 +177,12 @@ export const noMultipleCallbackResume = defineRule({
     type: "problem",
   },
   createOnce(context) {
-    let bindings: ReadonlyMap<number, ImportBinding> = new Map();
+    let bindings: ReadonlyMap<number, EffectImportBinding> = new Map();
     return {
       before() {
         bindings = collectImportBindings(
           context.sourceCode.ast,
-          IMPORT_BINDINGS
+          EFFECT_IMPORT_BINDINGS
         );
       },
       CallExpression(node) {

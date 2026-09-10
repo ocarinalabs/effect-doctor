@@ -83,6 +83,7 @@ describe.sequential.each(["9.39.5", "10.9.1"])(
             "--no-fund",
             "--no-package-lock",
             `eslint@${eslintVersion}`,
+            "effect@4.0.0-rc.113",
             oxlintPluginArchive,
             eslintPluginArchive,
           ]),
@@ -125,7 +126,7 @@ describe.sequential.each(["9.39.5", "10.9.1"])(
           name: "effect-doctor",
           version: "0.1.0",
         });
-        expect(Object.keys(effectDoctor.rules)).toHaveLength(15);
+        expect(Object.keys(effectDoctor.rules)).toHaveLength(24);
         expect(effectDoctor.configs.recommended).toBe(recommended);
         expect(recommended.plugins?.["effect-doctor"]).toBe(effectDoctor);
         expect(Object.keys(recommended.rules ?? {}).toSorted()).toEqual(
@@ -177,13 +178,13 @@ describe.sequential.each(["9.39.5", "10.9.1"])(
           overrideConfigFile: true,
         });
         const [result] = await eslint.lintText(
-          'import { Config } from "effect";\nexport const token = Config.string("API_TOKEN");\n',
+          'import { Config } from "effect";\nexport const token = Config.String("API_TOKEN");\n',
           { filePath: "source.mjs" }
         );
 
         expect(result?.messages).toEqual([
           expect.objectContaining({
-            message: "Use Config.redacted for secret configuration API_TOKEN.",
+            message: "Use Config.Redacted for secret configuration API_TOKEN.",
             ruleId: "effect-doctor/prefer-config-redacted",
             severity: 1,
           }),

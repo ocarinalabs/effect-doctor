@@ -1,4 +1,5 @@
-import { Effect, runSyncExit, sleep, tryPromise } from "effect";
+import { Effect } from "effect";
+import { runSyncExit, sleep, tryPromise } from "effect/Effect";
 
 export const promiseAtSyncBoundary = Effect.runSync(
   Effect.promise(() => Promise.resolve(1))

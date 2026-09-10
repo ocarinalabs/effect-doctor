@@ -2,13 +2,20 @@ import { defineRule } from "@oxlint/plugins";
 import type { Context, ESTree, Variable } from "@oxlint/plugins";
 
 import {
-  collectImportBindings,
   containsNode,
-  importedExportName,
   isFunctionBoundary,
   variableForReference,
-} from "./ast.ts";
-import type { FunctionBoundary } from "./ast.ts";
+} from "../internal/ast.ts";
+import type { FunctionBoundary } from "../internal/ast.ts";
+import {
+  collectModuleBindings,
+  defineEffectModule,
+  moduleExportName,
+} from "../internal/effect-module.ts";
+import type {
+  EffectModule,
+  ModuleBindings,
+} from "../internal/effect-module.ts";
 
 const ADAPTER_NAMES = [
   "decodeEffect",
@@ -39,24 +46,6 @@ const ADAPTER_NAMES = [
 ] as const;
 
 const ADAPTER_NAME_SET: ReadonlySet<string> = new Set(ADAPTER_NAMES);
-
-const directAdapterBindings = ADAPTER_NAMES.flatMap((name) => [
-  [`effect/Schema:named:${name}`, name] as const,
-  [`effect/SchemaParser:named:${name}`, name] as const,
-]);
-
-const ADAPTER_IMPORT_BINDINGS: ReadonlyMap<string, string> = new Map([
-  ["effect:named:Schema", "*"],
-  ["effect:named:SchemaParser", "*"],
-  ["effect/Schema:namespace", "*"],
-  ["effect/SchemaParser:namespace", "*"],
-  ...directAdapterBindings,
-]);
-
-const SCHEMA_IMPORT_BINDINGS: ReadonlyMap<string, string> = new Map([
-  ["effect:named:Schema", "*"],
-  ["effect/Schema:namespace", "*"],
-]);
 
 const BUILTIN_SCHEMA_EXPORTS: ReadonlySet<string> = new Set([
   "Any",
@@ -124,6 +113,70 @@ const BUILTIN_SCHEMA_EXPORTS: ReadonlySet<string> = new Set([
   "Void",
 ]);
 
+const SCHEMA_NAMED_IMPORTS = [
+  "Array",
+  "Class",
+  "Enum",
+  "Literal",
+  "Literals",
+  "Map",
+  "NonEmptyArray",
+  "NullOr",
+  "NullishOr",
+  "Option",
+  "OptionFromNullOr",
+  "Record",
+  "Redacted",
+  "Result",
+  "Set",
+  "Struct",
+  "TaggedStruct",
+  "Tuple",
+  "UndefinedOr",
+  "Union",
+  "annotate",
+  "brand",
+  "check",
+  "flip",
+  "fromJsonString",
+  "isFinite",
+  "isGreaterThan",
+  "isGreaterThanOrEqualTo",
+  "isInt",
+  "isLessThan",
+  "isLessThanOrEqualTo",
+  "isMaxLength",
+  "isMinLength",
+  "isPattern",
+  "makeFilter",
+  "mutable",
+  "mutableKey",
+  "optional",
+  "optionalKey",
+  "toType",
+  "withConstructorDefault",
+  "withDecodingDefault",
+] as const;
+
+const SCHEMA_INSTANCE_METHODS: ReadonlySet<string> = new Set([
+  "annotate",
+  "annotateKey",
+  "check",
+  "pipe",
+]);
+
+const SCHEMA_MODULE = defineEffectModule("effect", "Schema", [
+  ...ADAPTER_NAMES,
+  ...BUILTIN_SCHEMA_EXPORTS,
+  ...SCHEMA_NAMED_IMPORTS,
+]);
+
+const SCHEMA_PARSER_MODULE = defineEffectModule(
+  "effect",
+  "SchemaParser",
+  ADAPTER_NAMES
+);
+
 type TransparentExpression = Extract<
   ESTree.Expression,
   { readonly expression: ESTree.Expression }
@@ -138,7 +191,7 @@ type AdapterMatch = {
 type ClosedSchemaContext = {
   readonly boundary: FunctionBoundary;
   readonly context: Context;
-  readonly schemaBindings: ReadonlyMap<number, string>;
+  readonly schemaBindings: ModuleBindings;
   readonly seen: ReadonlySet<Variable>;
 };
 
@@ -148,11 +201,6 @@ type LiteralValue = Extract<
   ESTree.Expression,
   { readonly type: "Literal" }
 >["value"];
-
-type ConstructionProof = (
-  state: ClosedSchemaContext,
-  node: ESTree.CallExpression
-) => boolean;
 
 const LITERAL_VALUE_TYPES: ReadonlySet<string> = new Set([
   "bigint",
@@ -182,11 +230,15 @@ const unwrapContractExpression = (
   return node;
 };
 
-const safeImportedExportName = (
+const nonOptionalModuleExportName = (
   context: Context,
-  bindings: ReadonlyMap<number, string>,
-  expression: ESTree.Expression
+  bindings: ModuleBindings,
+  module: EffectModule,
+  expression: ESTree.Expression | ESTree.Super
 ): string | undefined => {
+  if (expression.type === "Super") {
+    return undefined;
+  }
   const node = unwrapContractExpression(expression);
   if (node.type === "ChainExpression") {
     return undefined;
@@ -194,7 +246,7 @@ const safeImportedExportName = (
   if (node.type === "MemberExpression" && (node.computed || node.optional)) {
     return undefined;
   }
-  return importedExportName(context, bindings, node);
+  return moduleExportName(context, bindings, module, node);
 };
 
 const enclosingFunction = (node: ESTree.Node): FunctionBoundary | undefined => {
@@ -220,19 +272,32 @@ const exactlyOneExpression = (
     : value;
 };
 
-const expressionAt = (
-  values: readonly ESTree.Argument[],
-  index: number
-): ESTree.Expression | undefined => {
-  const value = values[index];
-  return value === undefined || value.type === "SpreadElement"
-    ? undefined
-    : value;
+type AdapterBindings = {
+  readonly parser: ModuleBindings;
+  readonly schema: ModuleBindings;
 };
+
+const adapterName = (
+  context: Context,
+  bindings: AdapterBindings,
+  callee: ESTree.Expression | ESTree.Super
+): string | undefined =>
+  nonOptionalModuleExportName(
+    context,
+    bindings.schema,
+    SCHEMA_MODULE,
+    callee
+  ) ??
+  nonOptionalModuleExportName(
+    context,
+    bindings.parser,
+    SCHEMA_PARSER_MODULE,
+    callee
+  );
 
 const matchAdapter = (
   context: Context,
-  bindings: ReadonlyMap<number, string>,
+  bindings: AdapterBindings,
   application: ESTree.CallExpression
 ): AdapterMatch | undefined => {
   if (application.optional) {
@@ -246,7 +311,7 @@ const matchAdapter = (
   if (schema === undefined) {
     return undefined;
   }
-  const name = safeImportedExportName(context, bindings, factory.callee);
+  const name = adapterName(context, bindings, factory.callee);
   return name !== undefined && ADAPTER_NAME_SET.has(name)
     ? { factory, name, schema }
     : undefined;
@@ -266,8 +331,7 @@ const isSignedNumberLiteral = (node: ESTree.Expression): boolean => {
   return argument.type === "Literal" && typeof argument.value === "number";
 };
 
-const isLiteralValue = (expression: ESTree.Expression): boolean => {
-  const node = unwrapContractExpression(expression);
+const isLiteralValue = (node: ESTree.Expression): boolean => {
   if (node.type === "Literal") {
     return isSupportedLiteralValue(node.value);
   }
@@ -339,29 +403,22 @@ const stableDeclaratorInitializer = (
   return declarator.init;
 };
 
-const stableVariableInitializer = (
+const schemaExportName = (
   state: ClosedSchemaContext,
-  identifier: ESTree.IdentifierReference
-): ESTree.Expression | undefined => {
-  const variable = stableVariableForReference(state, identifier);
-  if (variable === undefined) {
-    return undefined;
-  }
-  const declarator = variableDeclarator(variable.defs[0]);
-  return declarator === undefined
-    ? undefined
-    : stableDeclaratorInitializer(state.boundary, declarator);
-};
+  expression: ESTree.Expression | ESTree.Super
+): string | undefined =>
+  nonOptionalModuleExportName(
+    state.context,
+    state.schemaBindings,
+    SCHEMA_MODULE,
+    expression
+  );
 
 const isBuiltinSchema = (
   state: ClosedSchemaContext,
   expression: ESTree.Expression
 ): boolean => {
-  const name = safeImportedExportName(
-    state.context,
-    state.schemaBindings,
-    expression
-  );
+  const name = schemaExportName(state, expression);
   return name !== undefined && BUILTIN_SCHEMA_EXPORTS.has(name);
 };
 
@@ -373,166 +430,123 @@ const withSeen = (
   seen: new Set([...state.seen, variable]),
 });
 
-const isClosedSchemaValue = (
+const isClosedStableReference = (
   state: ClosedSchemaContext,
-  expression: ESTree.Expression
+  identifier: ESTree.IdentifierReference
 ): boolean => {
-  const node = unwrapContractExpression(expression);
-  if (isBuiltinSchema(state, node)) {
-    return true;
-  }
-  if (node.type === "CallExpression") {
-    return isFreshClosedConstruction(state, node);
-  }
-  if (node.type !== "Identifier") {
+  const variable = stableVariableForReference(state, identifier);
+  if (variable === undefined) {
     return false;
   }
-  const variable = variableForReference(state.context, node);
-  const initializer = stableVariableInitializer(state, node);
+  const declarator = variableDeclarator(variable.defs[0]);
+  const initializer =
+    declarator === undefined
+      ? undefined
+      : stableDeclaratorInitializer(state.boundary, declarator);
   return (
-    variable !== undefined &&
     initializer !== undefined &&
-    isClosedSchemaValue(withSeen(state, variable), initializer)
+    isClosedValue(withSeen(state, variable), initializer)
   );
 };
 
-const isClosedStruct = (
+const isClosedArray = (
+  state: ClosedSchemaContext,
+  node: ESTree.ArrayExpression
+): boolean =>
+  node.elements.every(
+    (element) =>
+      element !== null &&
+      element.type !== "SpreadElement" &&
+      isClosedValue(state, element)
+  );
+
+const isClosedObject = (
+  state: ClosedSchemaContext,
+  node: ESTree.ObjectExpression
+): boolean =>
+  node.properties.every(
+    (property) =>
+      property.type === "Property" &&
+      isStaticStructProperty(property) &&
+      isClosedValue(state, property.value)
+  );
+
+const isClosedInstanceMethodCall = (
   state: ClosedSchemaContext,
   node: ESTree.CallExpression
 ): boolean => {
-  const argument = exactlyOneExpression(node.arguments);
-  if (argument === undefined) {
+  if (node.callee.type === "Super") {
     return false;
   }
-  const fields = unwrapContractExpression(argument);
+  const callee = unwrapContractExpression(node.callee);
   return (
-    fields.type === "ObjectExpression" &&
-    fields.properties.every(
-      (property) =>
-        property.type === "Property" &&
-        isStaticStructProperty(property) &&
-        isClosedSchemaValue(state, property.value)
-    )
+    callee.type === "MemberExpression" &&
+    !callee.computed &&
+    !callee.optional &&
+    callee.property.type === "Identifier" &&
+    SCHEMA_INSTANCE_METHODS.has(callee.property.name) &&
+    callee.object.type !== "Super" &&
+    isClosedValue(state, callee.object)
   );
 };
 
-const isClosedSchemaArray = (
-  state: ClosedSchemaContext,
-  expression: ESTree.Expression
-): boolean => {
-  const values = unwrapContractExpression(expression);
-  return (
-    values.type === "ArrayExpression" &&
-    values.elements.every(
-      (element) =>
-        element !== null &&
-        element.type !== "SpreadElement" &&
-        isClosedSchemaValue(state, element)
-    )
-  );
-};
-
-const isClosedLiteralArray = (expression: ESTree.Expression): boolean => {
-  const values = unwrapContractExpression(expression);
-  return (
-    values.type === "ArrayExpression" &&
-    values.elements.every(
-      (element) =>
-        element !== null &&
-        element.type !== "SpreadElement" &&
-        isLiteralValue(element)
-    )
-  );
-};
-
-const isClosedUnaryConstructor = (
-  state: ClosedSchemaContext,
-  node: ESTree.CallExpression
-): boolean => {
-  const argument = exactlyOneExpression(node.arguments);
-  return argument !== undefined && isClosedSchemaValue(state, argument);
-};
-
-const isClosedRecord = (
-  state: ClosedSchemaContext,
-  node: ESTree.CallExpression
-): boolean => {
-  if (node.arguments.length !== 2) {
-    return false;
-  }
-  const key = expressionAt(node.arguments, 0);
-  const value = expressionAt(node.arguments, 1);
-  return (
-    key !== undefined &&
-    value !== undefined &&
-    isClosedSchemaValue(state, key) &&
-    isClosedSchemaValue(state, value)
-  );
-};
-
-const isClosedSchemaArrayConstructor = (
-  state: ClosedSchemaContext,
-  node: ESTree.CallExpression
-): boolean => {
-  const argument = exactlyOneExpression(node.arguments);
-  return argument !== undefined && isClosedSchemaArray(state, argument);
-};
-
-const isClosedLiteralConstructor = (
-  _state: ClosedSchemaContext,
-  node: ESTree.CallExpression
-): boolean => {
-  const argument = exactlyOneExpression(node.arguments);
-  return argument !== undefined && isLiteralValue(argument);
-};
-
-const isClosedLiteralsConstructor = (
-  _state: ClosedSchemaContext,
-  node: ESTree.CallExpression
-): boolean => {
-  const argument = exactlyOneExpression(node.arguments);
-  return argument !== undefined && isClosedLiteralArray(argument);
-};
-
-const FRESH_CONSTRUCTION_PROOFS: ReadonlyMap<string, ConstructionProof> =
-  new Map([
-    ["Array", isClosedUnaryConstructor],
-    ["Literal", isClosedLiteralConstructor],
-    ["Literals", isClosedLiteralsConstructor],
-    ["NonEmptyArray", isClosedUnaryConstructor],
-    ["Record", isClosedRecord],
-    ["Struct", isClosedStruct],
-    ["Tuple", isClosedSchemaArrayConstructor],
-    ["Union", isClosedSchemaArrayConstructor],
-  ]);
-
-const isFreshClosedConstruction = (
+const isClosedConstruction = (
   state: ClosedSchemaContext,
   node: ESTree.CallExpression
 ): boolean => {
   if (node.optional) {
     return false;
   }
-  const name = safeImportedExportName(
-    state.context,
-    state.schemaBindings,
-    node.callee
+  const closedArguments = node.arguments.every(
+    (argument) =>
+      argument.type !== "SpreadElement" && isClosedValue(state, argument)
   );
-  const prove =
-    name === undefined ? undefined : FRESH_CONSTRUCTION_PROOFS.get(name);
-  return prove?.(state, node) ?? false;
+  if (!closedArguments) {
+    return false;
+  }
+  return (
+    schemaExportName(state, node.callee) !== undefined ||
+    isClosedInstanceMethodCall(state, node)
+  );
+};
+
+const isClosedValue = (
+  state: ClosedSchemaContext,
+  expression: ESTree.Expression
+): boolean => {
+  const node = unwrapContractExpression(expression);
+  if (isLiteralValue(node) || isBuiltinSchema(state, node)) {
+    return true;
+  }
+  switch (node.type) {
+    case "ArrayExpression": {
+      return isClosedArray(state, node);
+    }
+    case "CallExpression": {
+      return isClosedConstruction(state, node);
+    }
+    case "Identifier": {
+      return isClosedStableReference(state, node);
+    }
+    case "ObjectExpression": {
+      return isClosedObject(state, node);
+    }
+    default: {
+      return false;
+    }
+  }
 };
 
 const isFreshClosedSchema = (
   context: Context,
-  schemaBindings: ReadonlyMap<number, string>,
+  schemaBindings: ModuleBindings,
   boundary: FunctionBoundary,
   expression: ESTree.Expression
 ): boolean => {
   const node = unwrapContractExpression(expression);
   return (
     node.type === "CallExpression" &&
-    isFreshClosedConstruction(
+    isClosedConstruction(
       { boundary, context, schemaBindings, seen: new Set() },
       node
     )
@@ -548,28 +562,23 @@ export const noInlineSchemaCompile = defineRule({
     type: "suggestion",
   },
   createOnce(context) {
-    let adapterBindings: ReadonlyMap<number, string> = new Map();
-    let schemaBindings: ReadonlyMap<number, string> = new Map();
+    let bindings: AdapterBindings = { parser: new Map(), schema: new Map() };
     return {
       before() {
-        adapterBindings = collectImportBindings(
-          context.sourceCode.ast,
-          ADAPTER_IMPORT_BINDINGS
-        );
-        schemaBindings = collectImportBindings(
-          context.sourceCode.ast,
-          SCHEMA_IMPORT_BINDINGS
-        );
+        bindings = {
+          parser: collectModuleBindings(context, SCHEMA_PARSER_MODULE),
+          schema: collectModuleBindings(context, SCHEMA_MODULE),
+        };
       },
       CallExpression(node) {
-        const match = matchAdapter(context, adapterBindings, node);
+        const match = matchAdapter(context, bindings, node);
         if (match === undefined) {
           return;
         }
         const boundary = enclosingFunction(match.factory);
         if (
           boundary === undefined ||
-          !isFreshClosedSchema(context, schemaBindings, boundary, match.schema)
+          !isFreshClosedSchema(context, bindings.schema, boundary, match.schema)
         ) {
           return;
         }

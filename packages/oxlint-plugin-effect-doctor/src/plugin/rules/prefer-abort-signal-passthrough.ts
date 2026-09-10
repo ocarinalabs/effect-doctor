@@ -7,10 +7,10 @@ import {
   staticPropertyName,
   staticString,
   unwrapExpression,
-} from "./ast.ts";
-import { EFFECT_IMPORT_BINDINGS } from "./effect-imports.ts";
-import type { EffectImportBinding } from "./effect-imports.ts";
-import { enclosingPromiseAdapter } from "./promise-adapter.ts";
+} from "../internal/ast.ts";
+import { EFFECT_IMPORT_BINDINGS } from "../internal/effect-imports.ts";
+import type { EffectImportBinding } from "../internal/effect-imports.ts";
+import { enclosingPromiseAdapter } from "../internal/promise-adapter.ts";
 
 const definitivelyOmitsSignal = (
   argument: ESTree.Argument | undefined
