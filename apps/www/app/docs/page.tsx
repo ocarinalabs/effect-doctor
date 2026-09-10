@@ -86,8 +86,8 @@ export default function DocsPage() {
         <h2 id="compare">Compare a change</h2>
         <p>
           Compare a candidate checkout with a baseline. The report lists only
-          the findings the change introduced and the findings it resolved, so
-          an existing backlog does not block new work.
+          the findings the change introduced and the findings it resolved, so an
+          existing backlog does not block new work.
         </p>
         <Command>npx dr-effect@latest compare ../baseline .</Command>
       </section>
