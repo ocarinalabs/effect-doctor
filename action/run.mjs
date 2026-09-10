@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -89,36 +91,81 @@ const packageSpec = (version) => {
   return `dr-effect@${version}`;
 };
 
+const npmCli = path.join(
+  path.dirname(process.execPath),
+  "node_modules",
+  "npm",
+  "bin",
+  "npm-cli.js"
+);
+
+const runNpm = (args) =>
+  process.platform === "win32" && existsSync(npmCli)
+    ? run(process.execPath, [npmCli, ...args])
+    : run("npm", args, { shell: process.platform === "win32" });
+
+const packageDirectories = (modulesDirectory) => {
+  if (!existsSync(modulesDirectory)) {
+    return [];
+  }
+  return readdirSync(modulesDirectory)
+    .filter((name) => !name.startsWith("."))
+    .flatMap((name) =>
+      name.startsWith("@")
+        ? readdirSync(path.join(modulesDirectory, name)).map((scoped) =>
+            path.join(modulesDirectory, name, scoped)
+          )
+        : [path.join(modulesDirectory, name)]
+    );
+};
+
+const doctorScript = (prefix) => {
+  for (const directory of packageDirectories(
+    path.join(prefix, "node_modules")
+  )) {
+    const manifestPath = path.join(directory, "package.json");
+    if (!existsSync(manifestPath)) {
+      continue;
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    const bin =
+      typeof manifest.bin === "string"
+        ? manifest.bin
+        : manifest.bin?.["effect-doctor"];
+    if (typeof bin === "string") {
+      return path.join(directory, bin);
+    }
+  }
+  return undefined;
+};
+
 const installDoctor = (version) => {
   const spec = packageSpec(version);
   const identity = createHash("sha256").update(spec).digest("hex").slice(0, 16);
   const prefix = path.join(runnerTemp, `effect-doctor-toolchain-${identity}`);
-  const executable = path.join(
-    prefix,
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "effect-doctor.cmd" : "effect-doctor"
-  );
-  if (!existsSync(executable)) {
-    mkdirSync(prefix, { recursive: true });
-    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    const installation = run(npm, [
-      "install",
-      "--prefix",
-      prefix,
-      "--no-save",
-      "--no-audit",
-      "--no-fund",
-      "--ignore-scripts",
-      spec,
-    ]);
-    if (installation.status !== 0) {
-      throw new Error(
-        installation.stderr.trim() || `Could not install ${spec}`
-      );
-    }
+  const installed = doctorScript(prefix);
+  if (installed !== undefined) {
+    return installed;
   }
-  return executable;
+  mkdirSync(prefix, { recursive: true });
+  const installation = runNpm([
+    "install",
+    "--prefix",
+    prefix,
+    "--no-save",
+    "--no-audit",
+    "--no-fund",
+    "--ignore-scripts",
+    spec,
+  ]);
+  if (installation.status !== 0) {
+    throw new Error(installation.stderr.trim() || `Could not install ${spec}`);
+  }
+  const script = doctorScript(prefix);
+  if (script === undefined) {
+    throw new Error(`Installed ${spec} without an effect-doctor executable`);
+  }
+  return script;
 };
 
 const ensureCommit = (root, sha) => {
@@ -251,8 +298,8 @@ const makeBaseline = (repositoryRoot, candidate, prefix, baseSha) => {
   };
 };
 
-const runDoctor = (executable, args) => {
-  const result = run(executable, [...args, "--format", "json"], {
+const runDoctor = (script, args) => {
+  const result = run(process.execPath, [script, ...args, "--format", "json"], {
     env: {
       ...process.env,
       NO_COLOR: "1",
