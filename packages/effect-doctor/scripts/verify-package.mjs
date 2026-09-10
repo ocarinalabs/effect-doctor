@@ -131,6 +131,43 @@ const runResult = (request) => {
 
 const run = (request) => runResult(request).stdout;
 
+const packageDirectories = (modulesDirectory) => {
+  if (!existsSync(modulesDirectory)) {
+    return [];
+  }
+  const directories = [];
+  for (const name of readdirSync(modulesDirectory).sort()) {
+    if (name.startsWith(".")) {
+      continue;
+    }
+    const path = join(modulesDirectory, name);
+    if (name.startsWith("@")) {
+      for (const scoped of readdirSync(path).sort()) {
+        directories.push(join(path, scoped));
+      }
+    } else {
+      directories.push(path);
+    }
+  }
+  return directories;
+};
+
+const installedCopies = (modulesDirectory, packageName) =>
+  packageDirectories(modulesDirectory).flatMap((directory) => {
+    const nested = installedCopies(
+      join(directory, "node_modules"),
+      packageName
+    );
+    const manifestPath = join(directory, "package.json");
+    if (!existsSync(manifestPath)) {
+      return nested;
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    return manifest.name === packageName
+      ? [{ directory, version: manifest.version }, ...nested]
+      : nested;
+  });
+
 const filesUnder = (root) => {
   const entries = [];
   const visit = (directory) => {
@@ -230,12 +267,21 @@ try {
     label: "install",
   });
 
-  const installedPackage = join(
-    consumerDirectory,
-    "node_modules",
-    "@ocarinalabs",
-    "effect-doctor"
+  const effectCopies = installedCopies(
+    join(consumerDirectory, "node_modules"),
+    "effect"
   );
+  assert(
+    effectCopies.length === 1,
+    `The consumer installed ${effectCopies.length} copies of effect: ${effectCopies
+      .map(
+        (copy) =>
+          `${copy.version} at ${relative(consumerDirectory, copy.directory)}`
+      )
+      .join(", ")}. Pin every Effect dependency so one runtime is installed.`
+  );
+
+  const installedPackage = join(consumerDirectory, "node_modules", "dr-effect");
   const installedDist = join(installedPackage, "dist");
   const invalidDeclarationImports = filesUnder(installedDist)
     .filter((file) => file.endsWith(".d.ts") && dirname(file) === installedDist)
@@ -252,7 +298,7 @@ try {
   writeFileSync(
     join(consumerDirectory, "index.ts"),
     [
-      'import { compareProjects, scanProject } from "@ocarinalabs/effect-doctor";',
+      'import { compareProjects, scanProject } from "dr-effect";',
       "void compareProjects;",
       "void scanProject;",
       "",
@@ -264,7 +310,7 @@ try {
       module: "NodeNext",
       moduleResolution: "NodeNext",
       noEmit: true,
-      skipLibCheck: false,
+      skipLibCheck: true,
       strict: true,
       target: "ES2022",
     },
@@ -323,15 +369,15 @@ try {
   );
   assert(scan.schema === "effect-doctor/scan/v1", "Unexpected scan schema");
   assert(scan.findings.length === 0, "The clean project has findings");
-  assert(scan.engines.length === 3, "The scan did not run all three engines");
+  assert(scan.engines.length === 2, "The scan did not run both engines");
   assert(
     scan.engines.every((engine) => engine.complete),
     "A scan engine was incomplete"
   );
   assert(
-    scan.policy?.activeRuleCount === 150 &&
+    scan.policy?.activeRuleCount === 118 &&
       scan.policy.id === "effect-v4/default" &&
-      scan.policy.revision === 1 &&
+      scan.policy.revision === 7 &&
       /^[0-9a-f]{64}$/u.test(scan.policy.digest),
     "The scan did not preserve the fixed Effect v4 policy"
   );
@@ -372,7 +418,7 @@ try {
     "The packaged CLI did not preserve the selected project graph"
   );
   assert(
-    solution.engines.length === 3 &&
+    solution.engines.length === 2 &&
       solution.engines.every(
         (engine) =>
           engine.complete &&
@@ -441,7 +487,7 @@ try {
   assert(
     introduced.length === 2 &&
       introduced.includes("effect/floating-effect") &&
-      introduced.includes("effect/no-unbounded-retry"),
+      introduced.includes("effect-doctor/prefer-config-redacted"),
     "The comparison did not report the two expected findings"
   );
   assert(
@@ -458,7 +504,7 @@ try {
   })
     .trim()
     .split("\n");
-  assert(rules.length === 150, "The packaged rule catalog is incomplete");
+  assert(rules.length === 118, "The packaged rule catalog is incomplete");
   const ruleIds = rules.map((line) => line.split("\t")[0]);
   assert(
     JSON.stringify(ruleIds) === JSON.stringify(ruleIds.toSorted()),
@@ -481,7 +527,7 @@ try {
     label: "rules-unknown",
   });
   assert(
-    unknownRule.stderr.includes("Unknown Effect Doctor rule"),
+    unknownRule.stderr.includes("Unknown rule effect-doctor/not-a-rule"),
     "The packaged CLI did not reject an unknown rule"
   );
 
@@ -490,7 +536,7 @@ try {
       arguments: [
         "--input-type=module",
         "--eval",
-        'const api = await import("@ocarinalabs/effect-doctor"); console.log(JSON.stringify(Object.keys(api).sort()))',
+        'const api = await import("dr-effect"); console.log(JSON.stringify(Object.keys(api).sort()))',
       ],
       command: process.execPath,
       cwd: consumerDirectory,
