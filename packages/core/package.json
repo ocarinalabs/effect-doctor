@@ -28,7 +28,7 @@
     "effect": "4.0.0-rc.113"
   },
   "devDependencies": {
-    "@effect/tsgo": "0.45.0",
+    "@effect/tsgo": "0.51.1",
     "@oxlint/plugins": "1.82.0",
     "oxlint": "1.82.0",
     "oxlint-plugin-effect-doctor": "workspace:*",

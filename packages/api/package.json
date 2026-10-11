@@ -22,7 +22,7 @@
   "dependencies": {
     "@effect-doctor/core": "workspace:*",
     "@effect/platform-node": "4.0.0-rc.113",
-    "@effect/tsgo": "0.45.0",
+    "@effect/tsgo": "0.51.1",
     "@oxlint/plugins": "1.82.0",
     "effect": "4.0.0-rc.113",
     "oxlint": "1.82.0",
