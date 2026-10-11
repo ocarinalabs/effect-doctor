@@ -37,7 +37,7 @@
         "@effect-doctor/core": "workspace:*",
         "@effect/platform-node": "4.0.0-rc.113",
         "@effect/tsgo": "0.45.0",
-        "@oxlint/plugins": "1.82.0",
+        "@oxlint/plugins": "1.87.0",
         "effect": "4.0.0-rc.113",
         "oxlint": "1.82.0",
         "oxlint-plugin-effect-doctor": "workspace:*",
@@ -52,7 +52,7 @@
       },
       "devDependencies": {
         "@effect/tsgo": "0.45.0",
-        "@oxlint/plugins": "1.82.0",
+        "@oxlint/plugins": "1.87.0",
         "oxlint": "1.82.0",
         "oxlint-plugin-effect-doctor": "workspace:*",
         "typescript": "7.0.2",
@@ -68,7 +68,7 @@
         "@effect/platform-node": "4.0.0-rc.113",
         "@effect/platform-node-shared": "4.0.0-rc.113",
         "@effect/tsgo": "0.45.0",
-        "@oxlint/plugins": "1.82.0",
+        "@oxlint/plugins": "1.87.0",
         "effect": "4.0.0-rc.113",
         "oxlint": "1.82.0",
         "typescript": "7.0.2",
@@ -94,7 +94,7 @@
       "name": "oxlint-plugin-effect-doctor",
       "version": "0.1.0",
       "dependencies": {
-        "@oxlint/plugins": "1.82.0",
+        "@oxlint/plugins": "1.87.0",
       },
       "devDependencies": {
         "effect": "4.0.0-rc.113",
@@ -356,7 +356,7 @@
 
     "@oxlint/binding-win32-x64-msvc": ["@oxlint/binding-win32-x64-msvc@1.82.0", "", { "os": "win32", "cpu": "x64" }, "sha512-VTVoRIWJTb+wvUX8EYoPArfFH02whuR10goFXE/LHRRX33ajRrFgqbcONXZMiF4C5rnattfkm87HqYn8jb8hmQ=="],
 
-    "@oxlint/plugins": ["@oxlint/plugins@1.82.0", "", {}, "sha512-IDF4UXBNOaCeLoEpVxf5Bg85KOWdeuBEkbo1rGzS2vXcbD+GT1asBSeeTC+5BgW6NFTHVByd6N5giHsFPGtwAA=="],
+    "@oxlint/plugins": ["@oxlint/plugins@1.87.0", "", {}, "sha512-OtSZ6NxNkS7bkVy7zk9zGnajz2hVIu0uRPP/dJvJesGRaXtimpA4lpxap7FaIJndG2UIoKhnBU4DxyDQIWv6yg=="],
 
     "@polka/url": ["@polka/url@1.0.0-next.29", "", {}, "sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww=="],
 
