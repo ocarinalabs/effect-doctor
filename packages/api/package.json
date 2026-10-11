@@ -23,7 +23,7 @@
     "@effect-doctor/core": "workspace:*",
     "@effect/platform-node": "4.0.0-rc.113",
     "@effect/tsgo": "0.45.0",
-    "@oxlint/plugins": "1.82.0",
+    "@oxlint/plugins": "1.87.0",
     "effect": "4.0.0-rc.113",
     "oxlint": "1.82.0",
     "oxlint-plugin-effect-doctor": "workspace:*",
